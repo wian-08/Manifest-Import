@@ -4,13 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>D365 Staging Ingestion Portal</title>
-    <!-- SheetJS CDN for 100% client-side Excel/CSV parsing -->
+    <!-- SheetJS CDN for client-side Excel/CSV parsing -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
         * { box-sizing: border-box; }
         body { font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif; margin: 20px; background: #f4f5f7; color: #333; }
         .card { background: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); margin-bottom: 20px; border: 1px solid #e1e4e8; }
-        .flex { display: flex; gap: 15px; align-items: center; flex-wrap: wrap; }
+        .flex { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
         .between { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
         .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
         .map-box { background: #f8f9fa; padding: 10px; border: 1px solid #e0e0e0; border-radius: 6px; }
@@ -20,20 +20,28 @@
         button { background: #0078d4; color: white; border: none; cursor: pointer; font-weight: 600; transition: background 0.2s; }
         button:hover { background: #005a9e; }
         button:disabled { background: #cccccc; cursor: not-allowed; }
-        .btn-secondary { background: #f0f2f5; color: #333; border: 1px solid #ccc; }
-        .btn-secondary:hover { background: #e0e2e5; }
+        .btn-secondary { background: #6c757d; }
+        .btn-secondary:hover { background: #5a6268; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; background: #fff; }
         th, td { border: 1px solid #e1e4e8; padding: 8px; text-align: left; font-size: 12px; white-space: nowrap; }
         th { background: #f0f2f5; font-weight: 600; color: #444; }
         .table-scroll { overflow-x: auto; max-height: 300px; overflow-y: auto; }
-        .badge { background: #e1dfdd; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+        .badge { background: #0078d4; color: white; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+        .badge-id { background: #107c41; color: white; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; font-family: monospace; }
+        .section-header { margin-top: 0; margin-bottom: 12px; color: #0078d4; font-size: 15px; border-bottom: 2px solid #e0e0e0; padding-bottom: 4px; }
     </style>
 </head>
 <body>
 
 <!-- 1. FILE UPLOAD HEADER -->
 <div class="card">
-    <h2>📦 D365 Intake Arrival Line Staging Ingestion</h2>
+    <div class="between" style="margin-bottom: 10px;">
+        <h2 style="margin: 0;">📦 D365 Intake Arrival Line Staging Ingestion</h2>
+        <div id="headerUploadIdDisplay" style="display:none;">
+            <span style="font-size: 12px; font-weight: 700; color: #555;">Upload ID: </span>
+            <span id="uploadIdHeaderBadge" class="badge-id">--</span>
+        </div>
+    </div>
     <div class="flex">
         <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" />
         <label>Header Start Row: 
@@ -48,38 +56,68 @@
     <div class="between">
         <h3>👁️ Raw File Preview (First 5 Rows)</h3>
         <div class="flex">
-            <label><strong>Active Sheet:</strong></label>
-            <select id="rawSheetSelect" onchange="renderRawPreview()"></select>
+            <label><strong>Active Data Sheet:</strong></label>
+            <select id="rawSheetSelect" onchange="onSheetChange()"></select>
         </div>
     </div>
     <div id="rawPreviewContainer" class="table-scroll"></div>
 </div>
 
-<!-- 3. MAPPING & VENDOR PROFILES -->
+<!-- 3. CONFIGURATION: VENDOR, WAREHOUSE & LOCATION -->
 <div class="card" id="mappingCard" style="display:none;">
-    <h3>🛠️ Vendor Profile & Column Mapping</h3>
-    <div class="flex" style="margin-bottom: 15px; background: #f0f4f8; padding: 12px; border-radius: 6px;">
-        <label>Supplier Profile: 
-            <select id="profileSelect" onchange="onProfileChange()"><option value="">Custom Mapping</option></select>
-        </label>
-        <input type="text" id="newVendorName" placeholder="New Supplier Profile Name">
-        <button class="btn-secondary" onclick="saveVendorProfile()">Save Profile</button>
-        <button class="btn-secondary" onclick="applyMapping()">Apply Mapping</button>
+    <h3>🛠️ Ingestion Configuration & Column Mapping</h3>
+    
+    <!-- Vendor Profile Controls -->
+    <div class="map-box" style="margin-bottom: 15px;">
+        <h4 class="section-header">1. Supplier Profile Mapping (Dataverse Integration)</h4>
+        <div class="flex">
+            <label>Profile: 
+                <select id="profileSelect" onchange="onProfileChange()"><option value="">Custom Mapping</option></select>
+            </label>
+            <input type="text" id="vendorNameInput" placeholder="Vendor Account Name">
+            <button class="btn-secondary" onclick="loadDataverseVendorProfiles(true)">🔄 Fetch Profiles</button>
+            <button onclick="saveVendorProfile()">💾 Save Profile to Dataverse</button>
+        </div>
     </div>
+
+    <!-- Warehouse & Location Selection -->
+    <div class="map-box" style="margin-bottom: 15px;">
+        <h4 class="section-header">2. Warehouse & Location Selection</h4>
+        <div class="flex">
+            <label>Warehouse:
+                <select id="warehouseSelect" onchange="onWarehouseChange()"></select>
+            </label>
+            <label>Location:
+                <select id="locationSelect"></select>
+            </label>
+            <button class="btn-secondary" onclick="loadStorageLocations(true)">🔄 Fetch Warehouses</button>
+        </div>
+    </div>
+
+    <!-- Field Mapping Grid -->
+    <h4 class="section-header">3. Field Mapping</h4>
     <div id="mappingGrid" class="grid"></div>
 </div>
 
 <!-- 4. TRANSFORMED PAYLOAD PREVIEW -->
 <div class="card" id="previewCard" style="display:none;">
-    <h3>📊 Transformed Data Preview (Ready for D365)</h3>
+    <div class="between">
+        <h3>📊 Transformed Payload Preview (Unified Output)</h3>
+        <div class="flex">
+            <span><strong>Upload ID:</strong> <span id="uploadIdPreviewBadge" class="badge-id">--</span></span>
+            <span id="recordCountBadge" class="badge">0 Records</span>
+        </div>
+    </div>
     <div id="previewContainer"></div>
 </div>
 
 <script>
-// Replace with your actual Power Automate endpoint URL
+// Power Automate Endpoints
 const FLOW_URL = "https://b1a78497e32be5af85a1519f752e3d.4b.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/23/workflows/c97f0c8b5dc14beaa9fef7fa61c4c178/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=MoJYmkNSO9bcKeLUK6_4dMaE6BH5uYIpy8NwFr02ysU";
+const FETCH_PROFILES_URL = "https://b1a78497e32be5af85a1519f752e3d.4b.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/15/workflows/e669b59cd03c4a40a5b1468ee1161fec/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=OLQxMY1DV2lKSgQwXmQorwEp-GduVB-8j0HsgRWhILI";
+const SAVE_PROFILE_URL = "https://b1a78497e32be5af85a1519f752e3d.4b.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/22/workflows/029f6c9d020441f98d77af45740e4a49/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=pKypZ4Kw9hNV62ebd1OofUJK21dP-oDM1jGpGYfu9So";
+const FETCH_LOCATIONS_URL = "https://b1a78497e32be5af85a1519f752e3d.4b.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/01/workflows/d89a531daacd4aed9de7653612a5204b/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=BFt4PpB7g8qe_zhKs2srjDdgqjtf9amNmzYs0Lv0E5o";
 
-// Target fields required by D365 entity
 const TARGET_FIELDS = [
     "DefinitionGroup", "ExecutionId", "IsSelected", "TransferStatus", "InventBatchId", 
     "InventDimension1", "InventDimension2", "InventDimension3", "InventDimension4", 
@@ -88,31 +126,332 @@ const TARGET_FIELDS = [
     "LicensePlateId", "PurchId", "ReadyForProcessing", "WHSASNItemRefRecId", "WHSLoadId", 
     "wMSLocationId", "ArrivalConfirmPost", "InventDimension1Ext", "InventDimension2Ext", 
     "InventDimension3Ext", "InventDimension4Ext", "InventDimension5Ext", "InventDimension6Ext", 
-    "InventDimension7Ext", "InventDimension8Ext", "InventDimension11Ext", "ItemIdExt"
+    "InventDimension7Ext", "InventDimension8Ext", "InventDimension11Ext", "ItemIdExt",
+    "DistributionPackaging", "GGNNumber", "Grower", "LineNumber", "Quantity", 
+    "ShippingCarrier", "Vessel", "VendorBatchNumber", "SupplierPackhouse", 
+    "PurchaseOrder", "PackingDate", "ArrivalDate", "SupplierReference"
 ];
 
+// Display labels mapping for dimensions and custom logistics fields
+const FIELD_LABELS = {
+    "InventDimension1": "Produce Grade (InventDimension1)",
+    "InventDimension2": "Produce Variety (InventDimension2)",
+    "InventDimension3": "Produce Size (InventDimension3)",
+    "InventDimension4": "Produce Color (InventDimension4)",
+    "InventDimension5": "Country/Region (InventDimension5)",
+    "InventDimension6": "Brand/Mark (InventDimension6)",
+    "InventDimension7": "Pallet (InventDimension7)",
+    "InventDimension8": "Box Spec (InventDimension8)",
+    "InventDimension11": "Count (InventDimension11)",
+    "InventDimension1Ext": "Produce Grade Ext (InventDimension1Ext)",
+    "InventDimension2Ext": "Produce Variety Ext (InventDimension2Ext)",
+    "InventDimension3Ext": "Produce Size Ext (InventDimension3Ext)",
+    "InventDimension4Ext": "Produce Color Ext (InventDimension4Ext)",
+    "InventDimension5Ext": "Country/Region Ext (InventDimension5Ext)",
+    "InventDimension6Ext": "Brand/Mark Ext (InventDimension6Ext)",
+    "InventDimension7Ext": "Pallet Ext (InventDimension7Ext)",
+    "InventDimension8Ext": "Box Spec Ext (InventDimension8Ext)",
+    "InventDimension11Ext": "Count Ext (InventDimension11Ext)",
+    "DistributionPackaging": "Distribution Packaging",
+    "GGNNumber": "GGN Number",
+    "Grower": "Grower",
+    "LineNumber": "Line Number",
+    "Quantity": "Quantity",
+    "ShippingCarrier": "Shipping Carrier",
+    "Vessel": "Vessel",
+    "VendorBatchNumber": "Vendor Batch Number",
+    "SupplierPackhouse": "Supplier Packhouse",
+    "PurchaseOrder": "Purchase Order",
+    "PackingDate": "Packing Date",
+    "ArrivalDate": "Arrival Date",
+    "SupplierReference": "Supplier Reference"
+};
+
 let rawWorkbookData = {};
-let transformedPayloadData = {};
+let transformedPayloadData = []; // Single flat array of mapped rows
 let availableSourceColumns = [];
-let savedProfiles = {};
+let vendorProfiles = {};
+let storageLocations = [];
+let currentUploadId = "";
 
 document.getElementById('fileInput').addEventListener('change', handleFile);
 document.getElementById('headerOffset').addEventListener('change', handleFile);
 
-// Load vendor profiles from local storage (or replace with SharePoint REST API call)
-function loadSavedProfiles() {
-    savedProfiles = JSON.parse(localStorage.getItem('vendor_mappings') || '{}');
+// Unique ID Generator for tracking upload batches
+function generateUploadId() {
+    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const randomSuffix = Math.random().toString(36).substring(2, 7).toUpperCase();
+    return `UPL-${dateStr}-${randomSuffix}`;
+}
+
+function updateUploadIdDisplay() {
+    if (!currentUploadId) {
+        currentUploadId = generateUploadId();
+    }
+    document.getElementById('uploadIdHeaderBadge').innerText = currentUploadId;
+    document.getElementById('uploadIdPreviewBadge').innerText = currentUploadId;
+    document.getElementById('headerUploadIdDisplay').style.display = 'inline-block';
+}
+
+// Case-insensitive property lookup helper
+function getProp(obj, possibleKeys) {
+    if (!obj || typeof obj !== 'object') return "";
+    const foundKey = Object.keys(obj).find(k => 
+        possibleKeys.some(pk => pk.toLowerCase() === k.toLowerCase())
+    );
+    return foundKey ? obj[foundKey] : "";
+}
+
+// Resilient API Fetcher with request signature fallbacks
+async function fetchEndpoint(url, defaultPayload = { action: "getData" }) {
+    const attempts = [
+        () => fetch(url, { 
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' }, 
+            body: JSON.stringify(defaultPayload) 
+        }),
+        () => fetch(url, { method: 'GET' }),
+        () => fetch(url, { 
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' }, 
+            body: "{}" 
+        })
+    ];
+
+    for (const attempt of attempts) {
+        try {
+            const res = await attempt();
+            if (res.ok) return res;
+        } catch (e) {
+            console.warn("Attempt failed:", e);
+        }
+    }
+
+    return await fetch(url, { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' }, 
+        body: JSON.stringify(defaultPayload) 
+    });
+}
+
+// 1. Load Vendor Profiles (Power Automate -> Fallback Local JSON)
+async function loadDataverseVendorProfiles(isManual = false) {
+    let rawData = null;
+    let sourceLabel = "Dataverse API";
+
+    try {
+        console.log("Fetching vendor profiles from Power Automate...");
+        const res = await fetchEndpoint(FETCH_PROFILES_URL, { action: "getProfiles" });
+
+        if (res.ok) {
+            rawData = await res.json();
+        } else {
+            console.warn(`Power Automate Profiles Endpoint returned HTTP ${res.status}`);
+        }
+    } catch (apiErr) {
+        console.warn('API Connection failed:', apiErr);
+    }
+
+    if (!rawData) {
+        try {
+            sourceLabel = "Local 'vendor_mappings.json'";
+            const localRes = await fetch('./vendor_mappings.json');
+            if (localRes.ok) {
+                rawData = await localRes.json();
+            }
+        } catch (localErr) {
+            console.warn("Local file fetch failed:", localErr);
+        }
+    }
+
+    if (!rawData) {
+        if (isManual) alert("Unable to fetch profiles from Power Automate or load local 'vendor_mappings.json'.");
+        renderVendorDropdown();
+        return;
+    }
+
+    if (typeof rawData === "string") {
+        try { rawData = JSON.parse(rawData); } catch (e) {}
+    }
+
+    let records = [];
+    if (Array.isArray(rawData)) {
+        records = rawData;
+    } else if (rawData && Array.isArray(rawData.value)) {
+        records = rawData.value;
+    } else if (rawData && rawData.body && Array.isArray(rawData.body.value)) {
+        records = rawData.body.value;
+    } else if (rawData && Array.isArray(rawData.body)) {
+        records = rawData.body;
+    } else if (typeof rawData === 'object') {
+        records = Object.entries(rawData).map(([vendor, mapping]) => ({
+            manimp_vendoraccount: vendor,
+            ...mapping
+        }));
+    }
+
+    vendorProfiles = {};
+
+    records.forEach(rec => {
+        const vendorAccount = getProp(rec, ["manimp_vendoraccount", "VendorAccount", "vendoraccount", "vendor"]);
+        if (!vendorAccount) return;
+
+        const mapping = {};
+        TARGET_FIELDS.forEach(field => {
+            const possibleKeys = [`manimp_${field.toLowerCase()}`, field, field.toLowerCase()];
+            const matchedVal = getProp(rec, possibleKeys);
+            if (matchedVal !== undefined && matchedVal !== null && matchedVal !== "") {
+                mapping[field] = matchedVal;
+            }
+        });
+        vendorProfiles[vendorAccount] = mapping;
+    });
+
+    const profileCount = Object.keys(vendorProfiles).length;
+    renderVendorDropdown();
+    
+    if (availableSourceColumns.length > 0) {
+        autoDetectProfile();
+    }
+
+    if (isManual) {
+        if (profileCount > 0) {
+            alert(`Loaded ${profileCount} profile(s) via ${sourceLabel}:\n\n- ${Object.keys(vendorProfiles).join("\n- ")}`);
+        } else {
+            alert(`Connected to ${sourceLabel}, but 0 vendor profile mappings were parsed.`);
+        }
+    }
+}
+
+// 2. Load Storage Locations (Power Automate Endpoint -> Fallback Local storage_locations.json)
+async function loadStorageLocations(isManual = false) {
+    let rawData = null;
+    let sourceLabel = "Power Automate Endpoint";
+
+    try {
+        console.log("Fetching warehouses and locations from Power Automate...");
+        const res = await fetchEndpoint(FETCH_LOCATIONS_URL, { action: "getWarehouses" });
+
+        if (res.ok) {
+            rawData = await res.json();
+        } else {
+            console.warn(`Warehouse Endpoint returned HTTP ${res.status}`);
+        }
+    } catch (err) {
+        console.warn('Could not fetch locations from Power Automate:', err);
+    }
+
+    if (!rawData) {
+        try {
+            sourceLabel = "Local 'storage_locations.json'";
+            const sRes = await fetch('./storage_locations.json');
+            if (sRes.ok) {
+                rawData = await sRes.json();
+            }
+        } catch (err) {
+            console.warn('Could not load storage_locations.json locally:', err);
+        }
+    }
+
+    if (!rawData) {
+        if (isManual) alert("Unable to fetch warehouses from Power Automate or local 'storage_locations.json'.");
+        renderWarehouseDropdown();
+        return;
+    }
+
+    if (typeof rawData === "string") {
+        try { rawData = JSON.parse(rawData); } catch (e) {}
+    }
+
+    let parsed = [];
+    if (Array.isArray(rawData)) {
+        parsed = rawData;
+    } else if (rawData && Array.isArray(rawData.value)) {
+        parsed = rawData.value;
+    } else if (rawData && rawData.body && Array.isArray(rawData.body.value)) {
+        parsed = rawData.body.value;
+    } else if (rawData && Array.isArray(rawData.body)) {
+        parsed = rawData.body;
+    }
+
+    storageLocations = parsed;
+    renderWarehouseDropdown();
+
+    if (isManual) {
+        const uniqueWhCount = document.getElementById('warehouseSelect').options.length;
+        alert(`Successfully fetched ${storageLocations.length} locations across ${uniqueWhCount} warehouse(s) via ${sourceLabel}.`);
+    }
+}
+
+function renderVendorDropdown() {
     const select = document.getElementById('profileSelect');
+    const vendors = Object.keys(vendorProfiles);
+    
     select.innerHTML = '<option value="">Custom Mapping</option>';
-    Object.keys(savedProfiles).forEach(vendor => {
+    vendors.forEach(vendor => {
         select.innerHTML += `<option value="${vendor}">${vendor}</option>`;
     });
 }
-loadSavedProfiles();
+
+function renderWarehouseDropdown() {
+    const whSelect = document.getElementById('warehouseSelect');
+    whSelect.innerHTML = '';
+
+    const uniqueWarehouses = [];
+    const map = new Map();
+
+    storageLocations.forEach(item => {
+        const code = getProp(item, ["WarehouseCode", "Warehouse_code", "warehouse_code", "warehouse_name"]);
+        const name = getProp(item, ["WarehouseName", "warehouse_name", "Warehouse_name"]) || code;
+        
+        if (code && !map.has(code)) {
+            map.set(code, true);
+            uniqueWarehouses.push({ code, name });
+        }
+    });
+
+    if (uniqueWarehouses.length === 0) {
+        whSelect.innerHTML = '<option value="">No Warehouses Found</option>';
+        return;
+    }
+
+    uniqueWarehouses.forEach(wh => {
+        whSelect.innerHTML += `<option value="${wh.code}">${wh.name}${wh.name !== wh.code ? ' (' + wh.code + ')' : ''}</option>`;
+    });
+
+    onWarehouseChange();
+}
+
+function onWarehouseChange() {
+    const selectedWhCode = document.getElementById('warehouseSelect').value;
+    const locSelect = document.getElementById('locationSelect');
+    locSelect.innerHTML = '';
+
+    const matchingLocs = storageLocations.filter(item => {
+        const code = getProp(item, ["WarehouseCode", "Warehouse_code", "warehouse_code", "warehouse_name"]);
+        return code === selectedWhCode;
+    });
+
+    matchingLocs.forEach(item => {
+        const locCode = getProp(item, ["LocationCode", "Location_code", "location_code", "location_name"]);
+        const locName = getProp(item, ["LocationName", "location_name", "Location_name"]) || locCode;
+        if (locCode) {
+            locSelect.innerHTML += `<option value="${locCode}">${locName}${locName !== locCode ? ' (' + locCode + ')' : ''}</option>`;
+        }
+    });
+}
+
+// Initial Data Loading
+loadDataverseVendorProfiles(false);
+loadStorageLocations(false);
 
 function handleFile(e) {
     const file = document.getElementById('fileInput').files[0];
     if (!file) return;
+
+    // Generate fresh Unique Upload ID for new file upload batch
+    currentUploadId = generateUploadId();
+    updateUploadIdDisplay();
 
     const offset = parseInt(document.getElementById('headerOffset').value) || 0;
     const reader = new FileReader();
@@ -122,8 +461,6 @@ function handleFile(e) {
         const workbook = XLSX.read(data, { type: 'array' });
         
         rawWorkbookData = {};
-        availableSourceColumns = [];
-
         const sheetSelect = document.getElementById('rawSheetSelect');
         sheetSelect.innerHTML = '';
 
@@ -132,18 +469,9 @@ function handleFile(e) {
             const worksheet = workbook.Sheets[sheetName];
             const json = XLSX.utils.sheet_to_json(worksheet, { range: offset, defval: "" });
             rawWorkbookData[sheetName] = json;
-
-            if (json.length > 0) {
-                Object.keys(json[0]).forEach(col => {
-                    if (!availableSourceColumns.includes(col)) availableSourceColumns.push(col);
-                });
-            }
         });
 
-        renderRawPreview();
-        renderMappingControls();
-        autoDetectProfile();
-        applyMapping();
+        onSheetChange();
 
         document.getElementById('rawPreviewCard').style.display = 'block';
         document.getElementById('mappingCard').style.display = 'block';
@@ -151,6 +479,22 @@ function handleFile(e) {
     };
 
     reader.readAsArrayBuffer(file);
+}
+
+function onSheetChange() {
+    const selectedSheet = document.getElementById('rawSheetSelect').value;
+    const rows = rawWorkbookData[selectedSheet] || [];
+
+    availableSourceColumns = [];
+    if (rows.length > 0) {
+        Object.keys(rows[0]).forEach(col => {
+            if (!availableSourceColumns.includes(col)) availableSourceColumns.push(col);
+        });
+    }
+
+    renderRawPreview();
+    renderMappingControls();
+    autoDetectProfile();
 }
 
 function renderRawPreview() {
@@ -180,11 +524,10 @@ function renderRawPreview() {
 
 function renderMappingControls() {
     const grid = document.getElementById('mappingGrid');
-    grid.innerHTML = '';
+    const selectedSheet = document.getElementById('rawSheetSelect').value;
+    const sampleRow = (rawWorkbookData[selectedSheet] && rawWorkbookData[selectedSheet][0]) ? rawWorkbookData[selectedSheet][0] : {};
 
-    const firstSheetName = Object.keys(rawWorkbookData)[0];
-    const sampleRow = (rawWorkbookData[firstSheetName] && rawWorkbookData[firstSheetName][0]) ? rawWorkbookData[firstSheetName][0] : {};
-
+    let gridHtml = '';
     TARGET_FIELDS.forEach(field => {
         let optionsHtml = `<option value="[ Ignore Field ]">[ Ignore Field ]</option>`;
         
@@ -196,21 +539,25 @@ function renderMappingControls() {
             optionsHtml += `<option value="${srcCol}" ${isMatch ? 'selected' : ''}>${srcCol}${previewText}</option>`;
         });
 
-        grid.innerHTML += `
+        const displayLabel = FIELD_LABELS[field] || field;
+
+        gridHtml += `
             <div class="map-box">
-                <label>${field}</label>
-                <select id="map_${field}" style="width:100%;">${optionsHtml}</select>
+                <label>${displayLabel}</label>
+                <select id="map_${field}" onchange="applyMapping()" style="width:100%;">${optionsHtml}</select>
             </div>
         `;
     });
+
+    grid.innerHTML = gridHtml;
 }
 
 function autoDetectProfile() {
     let bestMatch = "", highestScore = 0;
     const allHeaders = availableSourceColumns.map(c => c.toLowerCase().trim());
 
-    Object.entries(savedProfiles).forEach(([vendor, mapping]) => {
-        const matches = Object.values(mapping).filter(src => allHeaders.includes(src.toLowerCase().trim())).length;
+    Object.entries(vendorProfiles).forEach(([vendor, mapping]) => {
+        const matches = Object.values(mapping).filter(src => allHeaders.includes(String(src).toLowerCase().trim())).length;
         if (matches > highestScore) {
             highestScore = matches;
             bestMatch = vendor;
@@ -220,54 +567,109 @@ function autoDetectProfile() {
     if (highestScore > 0) {
         document.getElementById('profileSelect').value = bestMatch;
         onProfileChange();
+    } else {
+        applyMapping();
     }
 }
 
 function onProfileChange() {
-    const profile = document.getElementById('profileSelect').value;
-    if (!profile || !savedProfiles[profile]) return;
+    const vendorName = document.getElementById('profileSelect').value;
+    document.getElementById('vendorNameInput').value = vendorName;
 
-    const mapping = savedProfiles[profile];
+    if (!vendorName || !vendorProfiles[vendorName]) {
+        applyMapping();
+        return;
+    }
+
+    const mapping = vendorProfiles[vendorName];
+
     TARGET_FIELDS.forEach(field => {
         const select = document.getElementById(`map_${field}`);
-        if (select) select.value = mapping[field] || "[ Ignore Field ]";
+        if (!select) return;
+
+        const savedSourceCol = mapping[field];
+        if (!savedSourceCol) {
+            select.value = "[ Ignore Field ]";
+            return;
+        }
+
+        const matchedOption = Array.from(select.options).find(opt => 
+            opt.value.toLowerCase().trim() === String(savedSourceCol).toLowerCase().trim()
+        );
+
+        select.value = matchedOption ? matchedOption.value : "[ Ignore Field ]";
     });
+
     applyMapping();
 }
 
-function saveVendorProfile() {
-    const vendorName = document.getElementById('newVendorName').value.trim();
-    if (!vendorName) return alert('Enter a supplier profile name.');
+// 3. Save Profile directly to Dataverse
+async function saveVendorProfile() {
+    let vendorName = document.getElementById('vendorNameInput').value.trim();
+    if (!vendorName) vendorName = document.getElementById('profileSelect').value;
+    if (!vendorName) return alert('Please enter or select a Vendor Account.');
 
-    const mapping = {};
+    const payload = {
+        "manimp_vendoraccount": vendorName
+    };
+    const localMapping = {};
+
     TARGET_FIELDS.forEach(field => {
-        const val = document.getElementById(`map_${field}`).value;
-        if (val !== "[ Ignore Field ]") mapping[field] = val;
+        const select = document.getElementById(`map_${field}`);
+        const val = select ? select.value : "[ Ignore Field ]";
+        const dvKey = `manimp_${field.toLowerCase()}`;
+
+        if (val !== "[ Ignore Field ]") {
+            payload[dvKey] = val;
+            localMapping[field] = val;
+        } else {
+            payload[dvKey] = "";
+        }
     });
 
-    savedProfiles[vendorName] = mapping;
-    localStorage.setItem('vendor_mappings', JSON.stringify(savedProfiles));
-    loadSavedProfiles();
-    document.getElementById('profileSelect').value = vendorName;
-    alert(`Vendor Profile '${vendorName}' saved!`);
+    try {
+        const res = await fetch(SAVE_PROFILE_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+            vendorProfiles[vendorName] = localMapping;
+            renderVendorDropdown();
+            document.getElementById('profileSelect').value = vendorName;
+            alert(`Profile for '${vendorName}' successfully saved to Dataverse!`);
+        } else {
+            alert(`Error saving to Dataverse: HTTP ${res.status}`);
+        }
+    } catch (err) {
+        alert(`Connection failed: ${err.message}`);
+    }
+
+    applyMapping();
 }
 
+// Transform selected data sheet into a SINGLE unified payload array
 function applyMapping() {
     const currentMapping = {};
     TARGET_FIELDS.forEach(field => {
-        currentMapping[field] = document.getElementById(`map_${field}`).value;
+        const select = document.getElementById(`map_${field}`);
+        if (select) currentMapping[field] = select.value;
     });
 
-    transformedPayloadData = {};
-    Object.entries(rawWorkbookData).forEach(([sheet, rows]) => {
-        transformedPayloadData[sheet] = rows.map(row => {
-            const transformedRow = {};
-            TARGET_FIELDS.forEach(target => {
-                const src = currentMapping[target];
-                transformedRow[target] = (src && src !== "[ Ignore Field ]") ? (row[src] || "") : "";
-            });
-            return transformedRow;
+    const activeSheet = document.getElementById('rawSheetSelect').value;
+    const rawRows = rawWorkbookData[activeSheet] || [];
+
+    // Map rows and filter out completely blank records
+    transformedPayloadData = rawRows.map(row => {
+        const transformedRow = {};
+        TARGET_FIELDS.forEach(target => {
+            const src = currentMapping[target];
+            transformedRow[target] = (src && src !== "[ Ignore Field ]") ? (row[src] !== undefined ? String(row[src]).trim() : "") : "";
         });
+        return transformedRow;
+    }).filter(row => {
+        return Object.values(row).some(val => val !== "" && val !== null && val !== undefined);
     });
 
     renderPreview();
@@ -275,36 +677,52 @@ function applyMapping() {
 
 function renderPreview() {
     const container = document.getElementById('previewContainer');
+    const badge = document.getElementById('recordCountBadge');
     container.innerHTML = '';
 
-    Object.entries(transformedPayloadData).forEach(([sheet, rows]) => {
-        if (rows.length === 0) return;
-        let tableHtml = `<div style="margin-top:15px;">
-            <h4>Sheet: <span class="badge">${sheet}</span> (${rows.length} total rows)</h4>
-            <div class="table-scroll"><table><thead><tr>`;
-            
-        TARGET_FIELDS.slice(0, 8).forEach(f => tableHtml += `<th>${f}</th>`);
-        tableHtml += `</tr></thead><tbody>`;
+    badge.innerText = `${transformedPayloadData.length} Records`;
+    updateUploadIdDisplay();
 
-        rows.slice(0, 5).forEach(row => {
-            tableHtml += `<tr>`;
-            TARGET_FIELDS.slice(0, 8).forEach(f => tableHtml += `<td>${row[f] || ''}</td>`);
-            tableHtml += `</tr>`;
-        });
-        tableHtml += `</tbody></table></div></div>`;
-        container.innerHTML += tableHtml;
+    if (transformedPayloadData.length === 0) {
+        container.innerHTML = '<p style="color:#888;">No transformed rows generated.</p>';
+        document.getElementById('previewCard').style.display = 'block';
+        return;
+    }
+
+    let tableHtml = `<div class="table-scroll"><table><thead><tr>`;
+    TARGET_FIELDS.forEach(f => {
+        const label = FIELD_LABELS[f] || f;
+        tableHtml += `<th>${label}</th>`;
     });
+    tableHtml += `</tr></thead><tbody>`;
 
+    transformedPayloadData.slice(0, 10).forEach(row => {
+        tableHtml += `<tr>`;
+        TARGET_FIELDS.forEach(f => tableHtml += `<td>${row[f] || ''}</td>`);
+        tableHtml += `</tr>`;
+    });
+    tableHtml += `</tbody></table></div>`;
+
+    if (transformedPayloadData.length > 10) {
+        tableHtml += `<p style="font-size:12px; color:#666; margin-top:8px;"><em>Showing first 10 of ${transformedPayloadData.length} records...</em></p>`;
+    }
+
+    container.innerHTML = tableHtml;
     document.getElementById('previewCard').style.display = 'block';
 }
 
 async function uploadPayload() {
     const file = document.getElementById('fileInput').files[0];
+    if (!currentUploadId) currentUploadId = generateUploadId();
+
     const payload = {
+        uploadId: currentUploadId,
         fileName: file.name,
         templateType: "TD_IntakeArrivalLineStaging",
-        vendorProfile: document.getElementById('profileSelect').value || "Custom",
-        data: transformedPayloadData
+        vendorProfile: document.getElementById('profileSelect').value || document.getElementById('vendorNameInput').value || "Custom",
+        warehouse: document.getElementById('warehouseSelect').value || "",
+        location: document.getElementById('locationSelect').value || "",
+        data: transformedPayloadData // Sent as a single flat array of mapped records
     };
 
     try {
@@ -314,7 +732,7 @@ async function uploadPayload() {
             body: JSON.stringify(payload)
         });
 
-        if (res.ok) alert('Successfully uploaded transformed payload to Power Automate!');
+        if (res.ok) alert(`Successfully uploaded payload!\n\nUpload ID: ${currentUploadId}`);
         else alert(`Error uploading: HTTP ${res.status}`);
     } catch (err) {
         alert(`Connection failed: ${err.message}`);
