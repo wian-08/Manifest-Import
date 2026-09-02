@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>D365 Staging Ingestion Portal</title>
-    <!-- SheetJS CDN for client-side Excel/CSV parsing -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
         * { box-sizing: border-box; }
@@ -12,7 +11,7 @@
         .card { background: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); margin-bottom: 20px; border: 1px solid #e1e4e8; }
         .flex { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
         .between { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; margin-top: 10px; }
         .map-box { background: #f8f9fa; padding: 10px; border: 1px solid #e0e0e0; border-radius: 6px; }
         .map-box label { font-size: 12px; font-weight: 700; color: #0078d4; display: block; margin-bottom: 4px; }
         select, input, button { padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
@@ -28,7 +27,30 @@
         .table-scroll { overflow-x: auto; max-height: 300px; overflow-y: auto; }
         .badge { background: #0078d4; color: white; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; }
         .badge-id { background: #107c41; color: white; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; font-family: monospace; }
-        .section-header { margin-top: 0; margin-bottom: 12px; color: #0078d4; font-size: 15px; border-bottom: 2px solid #e0e0e0; padding-bottom: 4px; }
+        .section-header { margin-top: 15px; margin-bottom: 12px; color: #0078d4; font-size: 15px; border-bottom: 2px solid #e0e0e0; padding-bottom: 4px; }
+        
+        /* Collapsible Accordion Styles */
+        .collapsible-header {
+            background-color: #eef3f8;
+            color: #0078d4;
+            cursor: pointer;
+            padding: 10px 14px;
+            width: 100%;
+            border: 1px solid #d0d7de;
+            border-radius: 6px;
+            text-align: left;
+            font-size: 14px;
+            font-weight: 700;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 15px;
+            transition: background-color 0.2s;
+        }
+        .collapsible-header:hover { background-color: #e2ecf5; }
+        .collapsible-content { display: none; padding-top: 5px; }
+        .collapsible-content.active { display: block; }
+        .toggle-icon { font-size: 12px; margin-left: 10px; }
     </style>
 </head>
 <body>
@@ -36,7 +58,7 @@
 <!-- 1. FILE UPLOAD HEADER -->
 <div class="card">
     <div class="between" style="margin-bottom: 10px;">
-        <h2 style="margin: 0;">📦 D365 Intake Arrival Line Staging Ingestion</h2>
+        <h2 style="margin: 0;">D365 Intake Arrival Line Staging Ingestion</h2>
         <div id="headerUploadIdDisplay" style="display:none;">
             <span style="font-size: 12px; font-weight: 700; color: #555;">Upload ID: </span>
             <span id="uploadIdHeaderBadge" class="badge-id">--</span>
@@ -45,7 +67,7 @@
     <div class="flex">
         <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" />
         <label>Header Start Row: 
-            <input type="number" id="headerOffset" value="0" min="0" style="width:60px;">
+            <input type="number" id="headerOffset" value="1" min="1" style="width:60px;">
         </label>
         <button id="uploadBtn" disabled onclick="uploadPayload()">Confirm & Upload to D365</button>
     </div>
@@ -63,46 +85,46 @@
     <div id="rawPreviewContainer" class="table-scroll"></div>
 </div>
 
-<!-- 3. CONFIGURATION: VENDOR, WAREHOUSE & LOCATION -->
+<!-- 3. CONFIGURATION: VENDOR & MAPPING -->
 <div class="card" id="mappingCard" style="display:none;">
     <h3>🛠️ Ingestion Configuration & Column Mapping</h3>
     
     <!-- Vendor Profile Controls -->
     <div class="map-box" style="margin-bottom: 15px;">
-        <h4 class="section-header">1. Supplier Profile Mapping (Dataverse Integration)</h4>
+        <h4 class="section-header" style="margin-top:0;">1. Supplier Profile Mapping (Dataverse Integration)</h4>
         <div class="flex">
             <label>Profile: 
                 <select id="profileSelect" onchange="onProfileChange()"><option value="">Custom Mapping</option></select>
             </label>
             <input type="text" id="vendorNameInput" placeholder="Vendor Account Name">
             <button class="btn-secondary" onclick="loadDataverseVendorProfiles(true)">🔄 Fetch Profiles</button>
-            <button onclick="saveVendorProfile()">💾 Save Profile to Dataverse</button>
+            <button onclick="saveVendorProfile()">Save Profile to Dataverse</button>
         </div>
     </div>
 
-    <!-- Warehouse & Location Selection -->
-    <div class="map-box" style="margin-bottom: 15px;">
-        <h4 class="section-header">2. Warehouse & Location Selection</h4>
-        <div class="flex">
-            <label>Warehouse:
-                <select id="warehouseSelect" onchange="onWarehouseChange()"></select>
-            </label>
-            <label>Location:
-                <select id="locationSelect"></select>
-            </label>
-            <button class="btn-secondary" onclick="loadStorageLocations(true)">🔄 Fetch Warehouses</button>
-        </div>
+    <!-- Field Mapping Section 1: Supplier Mapping (Collapsible) -->
+    <button class="collapsible-header" onclick="toggleSection('supplierSection', 'supplierToggleIcon')">
+        <span>2. Supplier Mapping (External Fields)</span>
+        <span id="supplierToggleIcon" class="toggle-icon">▼ Show</span>
+    </button>
+    <div id="supplierSection" class="collapsible-content">
+        <div id="supplierMappingGrid" class="grid"></div>
     </div>
 
-    <!-- Field Mapping Grid -->
-    <h4 class="section-header">3. Field Mapping</h4>
-    <div id="mappingGrid" class="grid"></div>
+    <!-- Field Mapping Section 2: D365 Mapping (Collapsible) -->
+    <button class="collapsible-header" onclick="toggleSection('d365Section', 'd365ToggleIcon')">
+        <span>3. D365 Core Mapping</span>
+        <span id="d365ToggleIcon" class="toggle-icon">▼ Show</span>
+    </button>
+    <div id="d365Section" class="collapsible-content">
+        <div id="d365MappingGrid" class="grid"></div>
+    </div>
 </div>
 
 <!-- 4. TRANSFORMED PAYLOAD PREVIEW -->
 <div class="card" id="previewCard" style="display:none;">
     <div class="between">
-        <h3>📊 Transformed Payload Preview (Unified Output)</h3>
+        <h3> Transformed Payload Preview (Unified Output)</h3>
         <div class="flex">
             <span><strong>Upload ID:</strong> <span id="uploadIdPreviewBadge" class="badge-id">--</span></span>
             <span id="recordCountBadge" class="badge">0 Records</span>
@@ -112,72 +134,101 @@
 </div>
 
 <script>
+// Toggle Accordion Function
+function toggleSection(contentId, iconId) {
+    const content = document.getElementById(contentId);
+    const icon = document.getElementById(iconId);
+    const isActive = content.classList.contains('active');
+
+    if (isActive) {
+        content.classList.remove('active');
+        icon.innerText = '▼ Show';
+    } else {
+        content.classList.add('active');
+        icon.innerText = '▲ Hide';
+    }
+}
+
 // Power Automate Endpoints
 const FLOW_URL = "https://b1a78497e32be5af85a1519f752e3d.4b.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/23/workflows/c97f0c8b5dc14beaa9fef7fa61c4c178/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=MoJYmkNSO9bcKeLUK6_4dMaE6BH5uYIpy8NwFr02ysU";
 const FETCH_PROFILES_URL = "https://b1a78497e32be5af85a1519f752e3d.4b.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/15/workflows/e669b59cd03c4a40a5b1468ee1161fec/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=OLQxMY1DV2lKSgQwXmQorwEp-GduVB-8j0HsgRWhILI";
 const SAVE_PROFILE_URL = "https://b1a78497e32be5af85a1519f752e3d.4b.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/22/workflows/029f6c9d020441f98d77af45740e4a49/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=pKypZ4Kw9hNV62ebd1OofUJK21dP-oDM1jGpGYfu9So";
 const FETCH_LOCATIONS_URL = "https://b1a78497e32be5af85a1519f752e3d.4b.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/01/workflows/d89a531daacd4aed9de7653612a5204b/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=BFt4PpB7g8qe_zhKs2srjDdgqjtf9amNmzYs0Lv0E5o";
 
-const TARGET_FIELDS = [
-    "DefinitionGroup", "ExecutionId", "IsSelected", "TransferStatus", "InventBatchId", 
-    "InventDimension1", "InventDimension2", "InventDimension3", "InventDimension4", 
-    "InventDimension5", "InventDimension6", "InventDimension7", "InventDimension8", 
-    "InventDimension11", "InventLocationId", "InventQty", "InventSiteId", "ItemId", 
-    "LicensePlateId", "PurchId", "ReadyForProcessing", "WHSASNItemRefRecId", "WHSLoadId", 
-    "wMSLocationId", "ArrivalConfirmPost", "InventDimension1Ext", "InventDimension2Ext", 
-    "InventDimension3Ext", "InventDimension4Ext", "InventDimension5Ext", "InventDimension6Ext", 
-    "InventDimension7Ext", "InventDimension8Ext", "InventDimension11Ext", "ItemIdExt",
-    "DistributionPackaging", "GGNNumber", "Grower", "LineNumber", "Quantity", 
-    "ShippingCarrier", "Vessel", "VendorBatchNumber", "SupplierPackhouse", 
-    "PurchaseOrder", "PackingDate", "ArrivalDate", "SupplierReference"
+// Complete target fields list
+const BASE_FIELDS = [
+    "ArrivalPort", "Vessel", "Voyage", "LoadingPortID", "OriginalDepartureDate", 
+    "DepartureDate", "ArrivalWeek", "ArrivalDate", "ArrivalTime", "ExternalReference", 
+    "Warehouse", "OnSiteDeliveryDate", "ContainerID", "BookingReference", "VendorAccount", 
+    "PONumber", "ShippingLine", "ShippingCarrier", "ContractNumber", "IntendedCustomerAccount", 
+    "ItemID", "Qty", "UnitID", "ProduceGrade", "ProduceVariety", "ProduceSize", 
+    "ProduceCount", "ProduceColor", "CountryRegion", "BrandMark", "DistributionPackaging", 
+    "BoxSpecification", "Owner", "IntendedRetailer", "PalletID", "NumberOfPallets", 
+    "TemTaleNumber", "EthyleneAbsorberLocation", "GrowerID", "GGNNumber", "PackingDate", 
+    "SupplierPackhouse", "Seal", "MultiGGNGrower", "DepartmentCode", "SupplierBatchNumber", "HarvestDate"
 ];
 
-// Display labels mapping for dimensions and custom logistics fields
+// Display Labels Map
 const FIELD_LABELS = {
-    "InventDimension1": "Produce Grade (InventDimension1)",
-    "InventDimension2": "Produce Variety (InventDimension2)",
-    "InventDimension3": "Produce Size (InventDimension3)",
-    "InventDimension4": "Produce Color (InventDimension4)",
-    "InventDimension5": "Country/Region (InventDimension5)",
-    "InventDimension6": "Brand/Mark (InventDimension6)",
-    "InventDimension7": "Pallet (InventDimension7)",
-    "InventDimension8": "Box Spec (InventDimension8)",
-    "InventDimension11": "Count (InventDimension11)",
-    "InventDimension1Ext": "Produce Grade Ext (InventDimension1Ext)",
-    "InventDimension2Ext": "Produce Variety Ext (InventDimension2Ext)",
-    "InventDimension3Ext": "Produce Size Ext (InventDimension3Ext)",
-    "InventDimension4Ext": "Produce Color Ext (InventDimension4Ext)",
-    "InventDimension5Ext": "Country/Region Ext (InventDimension5Ext)",
-    "InventDimension6Ext": "Brand/Mark Ext (InventDimension6Ext)",
-    "InventDimension7Ext": "Pallet Ext (InventDimension7Ext)",
-    "InventDimension8Ext": "Box Spec Ext (InventDimension8Ext)",
-    "InventDimension11Ext": "Count Ext (InventDimension11Ext)",
-    "DistributionPackaging": "Distribution Packaging",
-    "GGNNumber": "GGN Number",
-    "Grower": "Grower",
-    "LineNumber": "Line Number",
-    "Quantity": "Quantity",
-    "ShippingCarrier": "Shipping Carrier",
-    "Vessel": "Vessel",
-    "VendorBatchNumber": "Vendor Batch Number",
-    "SupplierPackhouse": "Supplier Packhouse",
-    "PurchaseOrder": "Purchase Order",
-    "PackingDate": "Packing Date",
+    "ArrivalPort": "Arrival Port",
+    "LoadingPortID": "Loading Port ID",
+    "OriginalDepartureDate": "Original Departure Date",
+    "DepartureDate": "Departure Date",
+    "ArrivalWeek": "Arrival Week",
     "ArrivalDate": "Arrival Date",
-    "SupplierReference": "Supplier Reference"
+    "ArrivalTime": "Arrival Time (24h)",
+    "ExternalReference": "External Reference",
+    "OnSiteDeliveryDate": "On Site Delivery Date",
+    "ContainerID": "Container ID",
+    "BookingReference": "Booking Reference",
+    "VendorAccount": "Vendor Account",
+    "PONumber": "PO Number",
+    "ShippingLine": "Shipping Line",
+    "ShippingCarrier": "Shipping Carrier",
+    "ContractNumber": "Contract Number",
+    "IntendedCustomerAccount": "Intended Customer Account",
+    "ItemID": "Item ID",
+    "UnitID": "Unit ID",
+    "ProduceGrade": "Produce Grade",
+    "ProduceVariety": "Produce Variety",
+    "ProduceSize": "Produce Size",
+    "ProduceCount": "Produce Count",
+    "ProduceColor": "Produce Color",
+    "CountryRegion": "Country / Region",
+    "BrandMark": "Brand / Mark",
+    "DistributionPackaging": "Distribution Packaging",
+    "BoxSpecification": "Box Specification",
+    "IntendedRetailer": "Intended Retailer",
+    "PalletID": "Pallet ID",
+    "NumberOfPallets": "Number of Pallets",
+    "TemTaleNumber": "TemTale Number",
+    "EthyleneAbsorberLocation": "Ethylene Absorber Location",
+    "GrowerID": "Grower ID",
+    "GGNNumber": "GGN Number",
+    "PackingDate": "Packing Date",
+    "SupplierPackhouse": "Supplier Packhouse",
+    "MultiGGNGrower": "Multi-GGN Grower",
+    "DepartmentCode": "Department Code",
+    "SupplierBatchNumber": "Supplier Batch Number",
+    "HarvestDate": "Harvest Date"
 };
 
+// Generate full target list with 'Ext' suffixes for Supplier Section
+let ALL_TARGET_FIELDS = [];
+BASE_FIELDS.forEach(f => ALL_TARGET_FIELDS.push(`${f}Ext`));
+ALL_TARGET_FIELDS = ALL_TARGET_FIELDS.concat(BASE_FIELDS);
+
 let rawWorkbookData = {};
-let transformedPayloadData = []; // Single flat array of mapped rows
+let transformedPayloadData = [];
 let availableSourceColumns = [];
 let vendorProfiles = {};
 let storageLocations = [];
 let currentUploadId = "";
+let currentSelectedSheet = "";
 
 document.getElementById('fileInput').addEventListener('change', handleFile);
 document.getElementById('headerOffset').addEventListener('change', handleFile);
 
-// Unique ID Generator for tracking upload batches
 function generateUploadId() {
     const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     const randomSuffix = Math.random().toString(36).substring(2, 7).toUpperCase();
@@ -185,15 +236,12 @@ function generateUploadId() {
 }
 
 function updateUploadIdDisplay() {
-    if (!currentUploadId) {
-        currentUploadId = generateUploadId();
-    }
+    if (!currentUploadId) currentUploadId = generateUploadId();
     document.getElementById('uploadIdHeaderBadge').innerText = currentUploadId;
     document.getElementById('uploadIdPreviewBadge').innerText = currentUploadId;
     document.getElementById('headerUploadIdDisplay').style.display = 'inline-block';
 }
 
-// Case-insensitive property lookup helper
 function getProp(obj, possibleKeys) {
     if (!obj || typeof obj !== 'object') return "";
     const foundKey = Object.keys(obj).find(k => 
@@ -202,20 +250,11 @@ function getProp(obj, possibleKeys) {
     return foundKey ? obj[foundKey] : "";
 }
 
-// Resilient API Fetcher with request signature fallbacks
 async function fetchEndpoint(url, defaultPayload = { action: "getData" }) {
     const attempts = [
-        () => fetch(url, { 
-            method: 'POST', 
-            headers: { 'Content-Type': 'application/json' }, 
-            body: JSON.stringify(defaultPayload) 
-        }),
+        () => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(defaultPayload) }),
         () => fetch(url, { method: 'GET' }),
-        () => fetch(url, { 
-            method: 'POST', 
-            headers: { 'Content-Type': 'application/json' }, 
-            body: "{}" 
-        })
+        () => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: "{}" })
     ];
 
     for (const attempt of attempts) {
@@ -226,70 +265,31 @@ async function fetchEndpoint(url, defaultPayload = { action: "getData" }) {
             console.warn("Attempt failed:", e);
         }
     }
-
-    return await fetch(url, { 
-        method: 'POST', 
-        headers: { 'Content-Type': 'application/json' }, 
-        body: JSON.stringify(defaultPayload) 
-    });
+    return await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(defaultPayload) });
 }
 
-// 1. Load Vendor Profiles (Power Automate -> Fallback Local JSON)
 async function loadDataverseVendorProfiles(isManual = false) {
     let rawData = null;
-    let sourceLabel = "Dataverse API";
-
     try {
-        console.log("Fetching vendor profiles from Power Automate...");
         const res = await fetchEndpoint(FETCH_PROFILES_URL, { action: "getProfiles" });
-
-        if (res.ok) {
-            rawData = await res.json();
-        } else {
-            console.warn(`Power Automate Profiles Endpoint returned HTTP ${res.status}`);
-        }
+        if (res.ok) rawData = await res.json();
     } catch (apiErr) {
         console.warn('API Connection failed:', apiErr);
     }
 
     if (!rawData) {
         try {
-            sourceLabel = "Local 'vendor_mappings.json'";
             const localRes = await fetch('./vendor_mappings.json');
-            if (localRes.ok) {
-                rawData = await localRes.json();
-            }
-        } catch (localErr) {
-            console.warn("Local file fetch failed:", localErr);
-        }
+            if (localRes.ok) rawData = await localRes.json();
+        } catch (localErr) {}
     }
 
     if (!rawData) {
-        if (isManual) alert("Unable to fetch profiles from Power Automate or load local 'vendor_mappings.json'.");
         renderVendorDropdown();
         return;
     }
 
-    if (typeof rawData === "string") {
-        try { rawData = JSON.parse(rawData); } catch (e) {}
-    }
-
-    let records = [];
-    if (Array.isArray(rawData)) {
-        records = rawData;
-    } else if (rawData && Array.isArray(rawData.value)) {
-        records = rawData.value;
-    } else if (rawData && rawData.body && Array.isArray(rawData.body.value)) {
-        records = rawData.body.value;
-    } else if (rawData && Array.isArray(rawData.body)) {
-        records = rawData.body;
-    } else if (typeof rawData === 'object') {
-        records = Object.entries(rawData).map(([vendor, mapping]) => ({
-            manimp_vendoraccount: vendor,
-            ...mapping
-        }));
-    }
-
+    let records = Array.isArray(rawData) ? rawData : (rawData.value || rawData.body || []);
     vendorProfiles = {};
 
     records.forEach(rec => {
@@ -297,7 +297,7 @@ async function loadDataverseVendorProfiles(isManual = false) {
         if (!vendorAccount) return;
 
         const mapping = {};
-        TARGET_FIELDS.forEach(field => {
+        ALL_TARGET_FIELDS.forEach(field => {
             const possibleKeys = [`manimp_${field.toLowerCase()}`, field, field.toLowerCase()];
             const matchedVal = getProp(rec, possibleKeys);
             if (matchedVal !== undefined && matchedVal !== null && matchedVal !== "") {
@@ -307,169 +307,90 @@ async function loadDataverseVendorProfiles(isManual = false) {
         vendorProfiles[vendorAccount] = mapping;
     });
 
-    const profileCount = Object.keys(vendorProfiles).length;
     renderVendorDropdown();
-    
-    if (availableSourceColumns.length > 0) {
-        autoDetectProfile();
-    }
-
-    if (isManual) {
-        if (profileCount > 0) {
-            alert(`Loaded ${profileCount} profile(s) via ${sourceLabel}:\n\n- ${Object.keys(vendorProfiles).join("\n- ")}`);
-        } else {
-            alert(`Connected to ${sourceLabel}, but 0 vendor profile mappings were parsed.`);
-        }
-    }
+    if (availableSourceColumns.length > 0) autoDetectProfile();
 }
 
-// 2. Load Storage Locations (Power Automate Endpoint -> Fallback Local storage_locations.json)
-async function loadStorageLocations(isManual = false) {
+async function loadStorageLocations() {
     let rawData = null;
-    let sourceLabel = "Power Automate Endpoint";
-
     try {
-        console.log("Fetching warehouses and locations from Power Automate...");
         const res = await fetchEndpoint(FETCH_LOCATIONS_URL, { action: "getWarehouses" });
-
-        if (res.ok) {
-            rawData = await res.json();
-        } else {
-            console.warn(`Warehouse Endpoint returned HTTP ${res.status}`);
-        }
-    } catch (err) {
-        console.warn('Could not fetch locations from Power Automate:', err);
-    }
+        if (res.ok) rawData = await res.json();
+    } catch (err) {}
 
     if (!rawData) {
         try {
-            sourceLabel = "Local 'storage_locations.json'";
             const sRes = await fetch('./storage_locations.json');
-            if (sRes.ok) {
-                rawData = await sRes.json();
-            }
-        } catch (err) {
-            console.warn('Could not load storage_locations.json locally:', err);
-        }
+            if (sRes.ok) rawData = await sRes.json();
+        } catch (err) {}
     }
 
-    if (!rawData) {
-        if (isManual) alert("Unable to fetch warehouses from Power Automate or local 'storage_locations.json'.");
-        renderWarehouseDropdown();
-        return;
-    }
-
-    if (typeof rawData === "string") {
-        try { rawData = JSON.parse(rawData); } catch (e) {}
-    }
-
-    let parsed = [];
-    if (Array.isArray(rawData)) {
-        parsed = rawData;
-    } else if (rawData && Array.isArray(rawData.value)) {
-        parsed = rawData.value;
-    } else if (rawData && rawData.body && Array.isArray(rawData.body.value)) {
-        parsed = rawData.body.value;
-    } else if (rawData && Array.isArray(rawData.body)) {
-        parsed = rawData.body;
-    }
-
-    storageLocations = parsed;
-    renderWarehouseDropdown();
-
-    if (isManual) {
-        const uniqueWhCount = document.getElementById('warehouseSelect').options.length;
-        alert(`Successfully fetched ${storageLocations.length} locations across ${uniqueWhCount} warehouse(s) via ${sourceLabel}.`);
-    }
+    storageLocations = Array.isArray(rawData) ? rawData : (rawData ? rawData.value || rawData.body || [] : []);
+    if (availableSourceColumns.length > 0) renderMappingControls();
 }
 
 function renderVendorDropdown() {
     const select = document.getElementById('profileSelect');
-    const vendors = Object.keys(vendorProfiles);
-    
     select.innerHTML = '<option value="">Custom Mapping</option>';
-    vendors.forEach(vendor => {
+    Object.keys(vendorProfiles).forEach(vendor => {
         select.innerHTML += `<option value="${vendor}">${vendor}</option>`;
     });
 }
 
-function renderWarehouseDropdown() {
-    const whSelect = document.getElementById('warehouseSelect');
-    whSelect.innerHTML = '';
-
-    const uniqueWarehouses = [];
+function getUniqueWarehouses() {
     const map = new Map();
-
+    const list = [];
     storageLocations.forEach(item => {
         const code = getProp(item, ["WarehouseCode", "Warehouse_code", "warehouse_code", "warehouse_name"]);
         const name = getProp(item, ["WarehouseName", "warehouse_name", "Warehouse_name"]) || code;
-        
         if (code && !map.has(code)) {
             map.set(code, true);
-            uniqueWarehouses.push({ code, name });
+            list.push({ code, name });
         }
     });
-
-    if (uniqueWarehouses.length === 0) {
-        whSelect.innerHTML = '<option value="">No Warehouses Found</option>';
-        return;
-    }
-
-    uniqueWarehouses.forEach(wh => {
-        whSelect.innerHTML += `<option value="${wh.code}">${wh.name}${wh.name !== wh.code ? ' (' + wh.code + ')' : ''}</option>`;
-    });
-
-    onWarehouseChange();
+    return list;
 }
 
-function onWarehouseChange() {
-    const selectedWhCode = document.getElementById('warehouseSelect').value;
-    const locSelect = document.getElementById('locationSelect');
-    locSelect.innerHTML = '';
-
-    const matchingLocs = storageLocations.filter(item => {
-        const code = getProp(item, ["WarehouseCode", "Warehouse_code", "warehouse_code", "warehouse_name"]);
-        return code === selectedWhCode;
-    });
-
-    matchingLocs.forEach(item => {
-        const locCode = getProp(item, ["LocationCode", "Location_code", "location_code", "location_name"]);
-        const locName = getProp(item, ["LocationName", "location_name", "Location_name"]) || locCode;
-        if (locCode) {
-            locSelect.innerHTML += `<option value="${locCode}">${locName}${locName !== locCode ? ' (' + locCode + ')' : ''}</option>`;
-        }
-    });
-}
-
-// Initial Data Loading
 loadDataverseVendorProfiles(false);
-loadStorageLocations(false);
+loadStorageLocations();
 
-function handleFile(e) {
-    const file = document.getElementById('fileInput').files[0];
+function handleFile() {
+    const fileInput = document.getElementById('fileInput');
+    const file = fileInput.files[0];
     if (!file) return;
 
-    // Generate fresh Unique Upload ID for new file upload batch
-    currentUploadId = generateUploadId();
-    updateUploadIdDisplay();
+    if (!currentUploadId) {
+        currentUploadId = generateUploadId();
+        updateUploadIdDisplay();
+    }
 
-    const offset = parseInt(document.getElementById('headerOffset').value) || 0;
+    const userRowInput = parseInt(document.getElementById('headerOffset').value) || 1;
+    const sheetRangeOffset = Math.max(0, userRowInput - 1);
+
     const reader = new FileReader();
-
     reader.onload = function(evt) {
         const data = new Uint8Array(evt.target.result);
         const workbook = XLSX.read(data, { type: 'array' });
         
         rawWorkbookData = {};
         const sheetSelect = document.getElementById('rawSheetSelect');
-        sheetSelect.innerHTML = '';
+        const activeBeforeReload = currentSelectedSheet || sheetSelect.value;
 
+        sheetSelect.innerHTML = '';
         workbook.SheetNames.forEach(sheetName => {
             sheetSelect.innerHTML += `<option value="${sheetName}">${sheetName}</option>`;
             const worksheet = workbook.Sheets[sheetName];
-            const json = XLSX.utils.sheet_to_json(worksheet, { range: offset, defval: "" });
+            
+            const json = XLSX.utils.sheet_to_json(worksheet, { range: sheetRangeOffset, defval: "" });
             rawWorkbookData[sheetName] = json;
         });
+
+        if (activeBeforeReload && workbook.SheetNames.includes(activeBeforeReload)) {
+            sheetSelect.value = activeBeforeReload;
+            currentSelectedSheet = activeBeforeReload;
+        } else {
+            currentSelectedSheet = sheetSelect.value;
+        }
 
         onSheetChange();
 
@@ -483,6 +404,7 @@ function handleFile(e) {
 
 function onSheetChange() {
     const selectedSheet = document.getElementById('rawSheetSelect').value;
+    currentSelectedSheet = selectedSheet;
     const rows = rawWorkbookData[selectedSheet] || [];
 
     availableSourceColumns = [];
@@ -518,38 +440,57 @@ function renderRawPreview() {
         tableHtml += '</tr>';
     });
     tableHtml += '</tbody></table>';
-
     container.innerHTML = tableHtml;
 }
 
-function renderMappingControls() {
-    const grid = document.getElementById('mappingGrid');
+function buildGridHtml(fields, isSupplierGroup = false) {
     const selectedSheet = document.getElementById('rawSheetSelect').value;
     const sampleRow = (rawWorkbookData[selectedSheet] && rawWorkbookData[selectedSheet][0]) ? rawWorkbookData[selectedSheet][0] : {};
+    const warehouses = getUniqueWarehouses();
 
     let gridHtml = '';
-    TARGET_FIELDS.forEach(field => {
+    fields.forEach(baseField => {
+        const fieldKey = isSupplierGroup ? `${baseField}Ext` : baseField;
         let optionsHtml = `<option value="[ Ignore Field ]">[ Ignore Field ]</option>`;
         
+        if (baseField === "Warehouse") {
+            optionsHtml += `<optgroup label="Static Warehouse Selection">`;
+            warehouses.forEach(wh => {
+                optionsHtml += `<option value="STATIC:${wh.code}">Static: ${wh.name} | ${wh.code}</option>`;
+            });
+            optionsHtml += `</optgroup><optgroup label="Excel File Columns">`;
+        }
+
         availableSourceColumns.forEach(srcCol => {
             const sampleValue = sampleRow[srcCol] !== undefined ? String(sampleRow[srcCol]).trim() : '';
             const previewText = sampleValue ? ` (e.g. "${sampleValue.substring(0, 18)}")` : ' (empty)';
             
-            const isMatch = srcCol.toLowerCase().trim() === field.toLowerCase().trim();
+            const matchTarget = isSupplierGroup ? `${baseField.toLowerCase()}ext` : baseField.toLowerCase();
+            const isMatch = srcCol.toLowerCase().replace(/[^a-z0-9]/g, '') === matchTarget.replace(/[^a-z0-9]/g, '');
             optionsHtml += `<option value="${srcCol}" ${isMatch ? 'selected' : ''}>${srcCol}${previewText}</option>`;
         });
 
-        const displayLabel = FIELD_LABELS[field] || field;
+        if (baseField === "Warehouse") {
+            optionsHtml += `</optgroup>`;
+        }
+
+        const rawLabel = FIELD_LABELS[baseField] || baseField;
+        const displayLabel = isSupplierGroup ? `${rawLabel} (Supplier Ext)` : rawLabel;
 
         gridHtml += `
             <div class="map-box">
                 <label>${displayLabel}</label>
-                <select id="map_${field}" onchange="applyMapping()" style="width:100%;">${optionsHtml}</select>
+                <select id="map_${fieldKey}" onchange="applyMapping()" style="width:100%;">${optionsHtml}</select>
             </div>
         `;
     });
 
-    grid.innerHTML = gridHtml;
+    return gridHtml;
+}
+
+function renderMappingControls() {
+    document.getElementById('supplierMappingGrid').innerHTML = buildGridHtml(BASE_FIELDS, true);
+    document.getElementById('d365MappingGrid').innerHTML = buildGridHtml(BASE_FIELDS, false);
 }
 
 function autoDetectProfile() {
@@ -582,8 +523,7 @@ function onProfileChange() {
     }
 
     const mapping = vendorProfiles[vendorName];
-
-    TARGET_FIELDS.forEach(field => {
+    ALL_TARGET_FIELDS.forEach(field => {
         const select = document.getElementById(`map_${field}`);
         if (!select) return;
 
@@ -596,25 +536,21 @@ function onProfileChange() {
         const matchedOption = Array.from(select.options).find(opt => 
             opt.value.toLowerCase().trim() === String(savedSourceCol).toLowerCase().trim()
         );
-
         select.value = matchedOption ? matchedOption.value : "[ Ignore Field ]";
     });
 
     applyMapping();
 }
 
-// 3. Save Profile directly to Dataverse
 async function saveVendorProfile() {
     let vendorName = document.getElementById('vendorNameInput').value.trim();
     if (!vendorName) vendorName = document.getElementById('profileSelect').value;
     if (!vendorName) return alert('Please enter or select a Vendor Account.');
 
-    const payload = {
-        "manimp_vendoraccount": vendorName
-    };
+    const payload = { "manimp_vendoraccount": vendorName };
     const localMapping = {};
 
-    TARGET_FIELDS.forEach(field => {
+    ALL_TARGET_FIELDS.forEach(field => {
         const select = document.getElementById(`map_${field}`);
         const val = select ? select.value : "[ Ignore Field ]";
         const dvKey = `manimp_${field.toLowerCase()}`;
@@ -649,10 +585,9 @@ async function saveVendorProfile() {
     applyMapping();
 }
 
-// Transform selected data sheet into a SINGLE unified payload array
 function applyMapping() {
     const currentMapping = {};
-    TARGET_FIELDS.forEach(field => {
+    ALL_TARGET_FIELDS.forEach(field => {
         const select = document.getElementById(`map_${field}`);
         if (select) currentMapping[field] = select.value;
     });
@@ -660,17 +595,22 @@ function applyMapping() {
     const activeSheet = document.getElementById('rawSheetSelect').value;
     const rawRows = rawWorkbookData[activeSheet] || [];
 
-    // Map rows and filter out completely blank records
     transformedPayloadData = rawRows.map(row => {
         const transformedRow = {};
-        TARGET_FIELDS.forEach(target => {
+        ALL_TARGET_FIELDS.forEach(target => {
             const src = currentMapping[target];
-            transformedRow[target] = (src && src !== "[ Ignore Field ]") ? (row[src] !== undefined ? String(row[src]).trim() : "") : "";
+            if (src && src !== "[ Ignore Field ]") {
+                if (src.startsWith("STATIC:")) {
+                    transformedRow[target] = src.replace("STATIC:", "");
+                } else {
+                    transformedRow[target] = row[src] !== undefined && row[src] !== null ? String(row[src]).trim() : "";
+                }
+            } else {
+                transformedRow[target] = "";
+            }
         });
         return transformedRow;
-    }).filter(row => {
-        return Object.values(row).some(val => val !== "" && val !== null && val !== undefined);
-    });
+    }).filter(row => Object.values(row).some(val => val !== "" && val !== null && val !== undefined));
 
     renderPreview();
 }
@@ -690,15 +630,17 @@ function renderPreview() {
     }
 
     let tableHtml = `<div class="table-scroll"><table><thead><tr>`;
-    TARGET_FIELDS.forEach(f => {
-        const label = FIELD_LABELS[f] || f;
+    ALL_TARGET_FIELDS.forEach(f => {
+        const base = f.endsWith("Ext") ? f.slice(0, -3) : f;
+        const rawLabel = FIELD_LABELS[base] || base;
+        const label = f.endsWith("Ext") ? `${rawLabel} (Ext)` : rawLabel;
         tableHtml += `<th>${label}</th>`;
     });
     tableHtml += `</tr></thead><tbody>`;
 
     transformedPayloadData.slice(0, 10).forEach(row => {
         tableHtml += `<tr>`;
-        TARGET_FIELDS.forEach(f => tableHtml += `<td>${row[f] || ''}</td>`);
+        ALL_TARGET_FIELDS.forEach(f => tableHtml += `<td>${row[f] || ''}</td>`);
         tableHtml += `</tr>`;
     });
     tableHtml += `</tbody></table></div>`;
@@ -720,9 +662,7 @@ async function uploadPayload() {
         fileName: file.name,
         templateType: "TD_IntakeArrivalLineStaging",
         vendorProfile: document.getElementById('profileSelect').value || document.getElementById('vendorNameInput').value || "Custom",
-        warehouse: document.getElementById('warehouseSelect').value || "",
-        location: document.getElementById('locationSelect').value || "",
-        data: transformedPayloadData // Sent as a single flat array of mapped records
+        data: transformedPayloadData
     };
 
     try {
