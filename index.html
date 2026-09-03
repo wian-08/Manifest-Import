@@ -96,7 +96,11 @@
             <label>Profile: 
                 <select id="profileSelect" onchange="onProfileChange()"><option value="">Custom Mapping</option></select>
             </label>
-            <input type="text" id="vendorNameInput" placeholder="Vendor Account Name">
+            <label>Supplier: 
+                <select id="supplierSelect" style="max-width: 320px;">
+                    <option value="">-- Select Supplier --</option>
+                </select>
+            </label>
             <button class="btn-secondary" onclick="loadDataverseVendorProfiles(true)">🔄 Fetch Profiles</button>
             <button onclick="saveVendorProfile()">Save Profile to Dataverse</button>
         </div>
@@ -154,6 +158,7 @@ const FLOW_URL = "https://b1a78497e32be5af85a1519f752e3d.4b.environment.api.powe
 const FETCH_PROFILES_URL = "https://b1a78497e32be5af85a1519f752e3d.4b.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/15/workflows/e669b59cd03c4a40a5b1468ee1161fec/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=OLQxMY1DV2lKSgQwXmQorwEp-GduVB-8j0HsgRWhILI";
 const SAVE_PROFILE_URL = "https://b1a78497e32be5af85a1519f752e3d.4b.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/22/workflows/029f6c9d020441f98d77af45740e4a49/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=pKypZ4Kw9hNV62ebd1OofUJK21dP-oDM1jGpGYfu9So";
 const FETCH_LOCATIONS_URL = "https://b1a78497e32be5af85a1519f752e3d.4b.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/01/workflows/d89a531daacd4aed9de7653612a5204b/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=BFt4PpB7g8qe_zhKs2srjDdgqjtf9amNmzYs0Lv0E5o";
+const FETCH_SUPPLIERS_URL = "https://b1a78497e32be5af85a1519f752e3d.4b.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/24/workflows/d105aa958ce24d79906bd7020067a44b/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=8-tEpKNVn-6mE_NbQoJKA6Cwq-6CT__udRkfdzg3bOo";
 
 // Complete target fields list
 const BASE_FIELDS = [
@@ -222,6 +227,7 @@ let rawWorkbookData = {};
 let transformedPayloadData = [];
 let availableSourceColumns = [];
 let vendorProfiles = {};
+let supplierList = [];
 let storageLocations = [];
 let currentUploadId = "";
 let currentSelectedSheet = "";
@@ -266,6 +272,39 @@ async function fetchEndpoint(url, defaultPayload = { action: "getData" }) {
         }
     }
     return await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(defaultPayload) });
+}
+
+async function loadSuppliers() {
+    try {
+        const res = await fetchEndpoint(FETCH_SUPPLIERS_URL, { action: "getSuppliers" });
+        if (res.ok) {
+            const data = await res.json();
+            supplierList = Array.isArray(data) ? data : (data.value || data.body || []);
+            renderSupplierDropdown();
+        }
+    } catch (err) {
+        console.warn("Error fetching suppliers:", err);
+    }
+}
+
+function renderSupplierDropdown() {
+    const select = document.getElementById('supplierSelect');
+    select.innerHTML = '<option value="">-- Select Supplier --</option>';
+    
+    // Sort suppliers alphabetically by name
+    supplierList.sort((a, b) => {
+        const nameA = (a.VendorName || "").toLowerCase();
+        const nameB = (b.VendorName || "").toLowerCase();
+        return nameA.localeCompare(nameB);
+    });
+
+    supplierList.forEach(sup => {
+        const acc = sup.VendorAccount || "";
+        const name = sup.VendorName || acc;
+        if (acc) {
+            select.innerHTML += `<option value="${acc}">${name} (${acc})</option>`;
+        }
+    });
 }
 
 async function loadDataverseVendorProfiles(isManual = false) {
@@ -348,9 +387,12 @@ function getUniqueWarehouses() {
             list.push({ code, name });
         }
     });
-    return list;
+
+    // Sort warehouses ascending by code
+    return list.sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true, sensitivity: 'base' }));
 }
 
+loadSuppliers();
 loadDataverseVendorProfiles(false);
 loadStorageLocations();
 
@@ -456,7 +498,7 @@ function buildGridHtml(fields, isSupplierGroup = false) {
         if (baseField === "Warehouse") {
             optionsHtml += `<optgroup label="Static Warehouse Selection">`;
             warehouses.forEach(wh => {
-                optionsHtml += `<option value="STATIC:${wh.code}">Static: ${wh.name} | ${wh.code}</option>`;
+                optionsHtml += `<option value="STATIC:${wh.code}">Static: ${wh.code} | ${wh.name}</option>`;
             });
             optionsHtml += `</optgroup><optgroup label="Excel File Columns">`;
         }
@@ -514,15 +556,15 @@ function autoDetectProfile() {
 }
 
 function onProfileChange() {
-    const vendorName = document.getElementById('profileSelect').value;
-    document.getElementById('vendorNameInput').value = vendorName;
+    const vendorAccount = document.getElementById('profileSelect').value;
+    document.getElementById('supplierSelect').value = vendorAccount;
 
-    if (!vendorName || !vendorProfiles[vendorName]) {
+    if (!vendorAccount || !vendorProfiles[vendorAccount]) {
         applyMapping();
         return;
     }
 
-    const mapping = vendorProfiles[vendorName];
+    const mapping = vendorProfiles[vendorAccount];
     ALL_TARGET_FIELDS.forEach(field => {
         const select = document.getElementById(`map_${field}`);
         if (!select) return;
@@ -543,11 +585,11 @@ function onProfileChange() {
 }
 
 async function saveVendorProfile() {
-    let vendorName = document.getElementById('vendorNameInput').value.trim();
-    if (!vendorName) vendorName = document.getElementById('profileSelect').value;
-    if (!vendorName) return alert('Please enter or select a Vendor Account.');
+    let vendorAccount = document.getElementById('supplierSelect').value;
+    if (!vendorAccount) vendorAccount = document.getElementById('profileSelect').value;
+    if (!vendorAccount) return alert('Please select a Supplier Account from the dropdown.');
 
-    const payload = { "manimp_vendoraccount": vendorName };
+    const payload = { "manimp_vendoraccount": vendorAccount };
     const localMapping = {};
 
     ALL_TARGET_FIELDS.forEach(field => {
@@ -571,10 +613,10 @@ async function saveVendorProfile() {
         });
 
         if (res.ok) {
-            vendorProfiles[vendorName] = localMapping;
+            vendorProfiles[vendorAccount] = localMapping;
             renderVendorDropdown();
-            document.getElementById('profileSelect').value = vendorName;
-            alert(`Profile for '${vendorName}' successfully saved to Dataverse!`);
+            document.getElementById('profileSelect').value = vendorAccount;
+            alert(`Profile for '${vendorAccount}' successfully saved to Dataverse!`);
         } else {
             alert(`Error saving to Dataverse: HTTP ${res.status}`);
         }
@@ -661,7 +703,7 @@ async function uploadPayload() {
         uploadId: currentUploadId,
         fileName: file.name,
         templateType: "TD_IntakeArrivalLineStaging",
-        vendorProfile: document.getElementById('profileSelect').value || document.getElementById('vendorNameInput').value || "Custom",
+        vendorProfile: document.getElementById('supplierSelect').value || document.getElementById('profileSelect').value || "Custom",
         data: transformedPayloadData
     };
 
