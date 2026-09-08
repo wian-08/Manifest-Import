@@ -108,7 +108,7 @@
 
     <!-- Field Mapping Section 1: Supplier Mapping (Collapsible) -->
     <button class="collapsible-header" onclick="toggleSection('supplierSection', 'supplierToggleIcon')">
-        <span>2. Supplier Mapping (External Fields)</span>
+        <span>2. Supplier Mapping (Invent Dimensions 1 - 26)</span>
         <span id="supplierToggleIcon" class="toggle-icon">▼ Show</span>
     </button>
     <div id="supplierSection" class="collapsible-content">
@@ -138,7 +138,6 @@
 </div>
 
 <script>
-// Toggle Accordion Function
 function toggleSection(contentId, iconId) {
     const content = document.getElementById(contentId);
     const icon = document.getElementById(iconId);
@@ -156,72 +155,112 @@ function toggleSection(contentId, iconId) {
 // Power Automate Endpoints
 const FLOW_URL = "https://b1a78497e32be5af85a1519f752e3d.4b.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/23/workflows/c97f0c8b5dc14beaa9fef7fa61c4c178/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=MoJYmkNSO9bcKeLUK6_4dMaE6BH5uYIpy8NwFr02ysU";
 const FETCH_PROFILES_URL = "https://b1a78497e32be5af85a1519f752e3d.4b.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/15/workflows/e669b59cd03c4a40a5b1468ee1161fec/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=OLQxMY1DV2lKSgQwXmQorwEp-GduVB-8j0HsgRWhILI";
-const SAVE_PROFILE_URL = "https://b1a78497e32be5af85a1519f752e3d.4b.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/22/workflows/029f6c9d020441f98d77af45740e4a49/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=pKypZ4Kw9hNV62ebd1OofUJK21dP-oDM1jGpGYfu9So";
+const SAVE_PROFILE_URL = "https://b1a78497e32be5af85a1519f752e3d.4b.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/29/workflows/93b44c4eabd3458cbe15ae7d74c08abe/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=xh9rljeQe0mE0wikkecUPkMidLOZAFqZ_SrUgK72sM0";
 const FETCH_LOCATIONS_URL = "https://b1a78497e32be5af85a1519f752e3d.4b.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/01/workflows/d89a531daacd4aed9de7653612a5204b/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=BFt4PpB7g8qe_zhKs2srjDdgqjtf9amNmzYs0Lv0E5o";
 const FETCH_SUPPLIERS_URL = "https://b1a78497e32be5af85a1519f752e3d.4b.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/24/workflows/d105aa958ce24d79906bd7020067a44b/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=8-tEpKNVn-6mE_NbQoJKA6Cwq-6CT__udRkfdzg3bOo";
 
-// Complete target fields list
-const BASE_FIELDS = [
-    "ArrivalPort", "Vessel", "Voyage", "LoadingPortID", "OriginalDepartureDate", 
-    "DepartureDate", "ArrivalWeek", "ArrivalDate", "ArrivalTime", "ExternalReference", 
-    "Warehouse", "OnSiteDeliveryDate", "ContainerID", "BookingReference", "VendorAccount", 
-    "PONumber", "ShippingLine", "ShippingCarrier", "ContractNumber", "IntendedCustomerAccount", 
-    "ItemID", "Qty", "UnitID", "ProduceGrade", "ProduceVariety", "ProduceSize", 
-    "ProduceCount", "ProduceColor", "CountryRegion", "BrandMark", "DistributionPackaging", 
-    "BoxSpecification", "Owner", "IntendedRetailer", "PalletID", "NumberOfPallets", 
-    "TemTaleNumber", "EthyleneAbsorberLocation", "GrowerID", "GGNNumber", "PackingDate", 
-    "SupplierPackhouse", "Seal", "MultiGGNGrower", "DepartmentCode", "SupplierBatchNumber", "HarvestDate"
+// Supplier Target Fields (INVENTDIMENSION1EXT through INVENTDIMENSION26EXT)
+const SUPPLIER_FIELDS = Array.from({ length: 26 }, (_, i) => `INVENTDIMENSION${i + 1}EXT`);
+
+// Exact D365 Target Fields
+const D365_FIELDS = [
+    "WEEK", "WAREHOUSE", "VOYAGE", "VESSEL", "VENDORACCOUNT", "UNITID", "TEMPTALENUMBER",
+    "SUPPLIERPACKHOUSE", "SHIPPINGLINE", "SHIPPINGCARRIER", "SEAL", "QTY", "PRODUCEVARIETY",
+    "PRODUCESIZE", "PRODUCEGRADE", "PRODUCECOUNT", "PRODUCECOLOR", "PONUMBER", "PDSVENDBATCHID",
+    "PALLETID", "PACKINGDATE", "OWNER", "ORIGINALDEPARTUREDATE", "ONSITEDELIVERYDATE",
+    "NUMBEROFPALLET", "MULTIGGNGROWER", "LOADINGPORTID", "LINESTATUS", "LINENUMBER", "ITEMID",
+    "INTENDEDRETAILER", "INTENDEDCUSTOMERACCOUNT", "HARVESTDATE", "GUIDX", "GROWERID",
+    "GGNNUMBER", "ETHYLENEABSORBERLOCATION", "ERRORLOG", "DISTRIBUTIONPACKAGING", "DEPARTUREDATE",
+    "DEPARTMENTCODE", "COUNTRYREGION", "CONTRACTNUMBER", "CONTAINERID", "BRANDMARK",
+    "BOXSPECIFICATION", "BOOKINGREFERENCE", "ARRIVALTIME", "ARRIVALPORT", "ARRIVALDATE"
 ];
+
+// Master collection of target fields
+const ALL_TARGET_FIELDS = [...SUPPLIER_FIELDS, ...D365_FIELDS];
 
 // Display Labels Map
 const FIELD_LABELS = {
-    "ArrivalPort": "Arrival Port",
-    "LoadingPortID": "Loading Port ID",
-    "OriginalDepartureDate": "Original Departure Date",
-    "DepartureDate": "Departure Date",
-    "ArrivalWeek": "Arrival Week",
-    "ArrivalDate": "Arrival Date",
-    "ArrivalTime": "Arrival Time (24h)",
-    "ExternalReference": "External Reference",
-    "OnSiteDeliveryDate": "On Site Delivery Date",
-    "ContainerID": "Container ID",
-    "BookingReference": "Booking Reference",
-    "VendorAccount": "Vendor Account",
-    "PONumber": "PO Number",
-    "ShippingLine": "Shipping Line",
-    "ShippingCarrier": "Shipping Carrier",
-    "ContractNumber": "Contract Number",
-    "IntendedCustomerAccount": "Intended Customer Account",
-    "ItemID": "Item ID",
-    "UnitID": "Unit ID",
-    "ProduceGrade": "Produce Grade",
-    "ProduceVariety": "Produce Variety",
-    "ProduceSize": "Produce Size",
-    "ProduceCount": "Produce Count",
-    "ProduceColor": "Produce Color",
-    "CountryRegion": "Country / Region",
-    "BrandMark": "Brand / Mark",
-    "DistributionPackaging": "Distribution Packaging",
-    "BoxSpecification": "Box Specification",
-    "IntendedRetailer": "Intended Retailer",
-    "PalletID": "Pallet ID",
-    "NumberOfPallets": "Number of Pallets",
-    "TemTaleNumber": "TemTale Number",
-    "EthyleneAbsorberLocation": "Ethylene Absorber Location",
-    "GrowerID": "Grower ID",
-    "GGNNumber": "GGN Number",
-    "PackingDate": "Packing Date",
-    "SupplierPackhouse": "Supplier Packhouse",
-    "MultiGGNGrower": "Multi-GGN Grower",
-    "DepartmentCode": "Department Code",
-    "SupplierBatchNumber": "Supplier Batch Number",
-    "HarvestDate": "Harvest Date"
-};
+    // Supplier Mapping (Invent Dimensions 1-26)
+    "INVENTDIMENSION1EXT": "Arroval Port",
+    "INVENTDIMENSION2EXT": "Loading Port ID",
+    "INVENTDIMENSION3EXT": "Warehouse",
+    "INVENTDIMENSION4EXT": "Vendor Account",
+    "INVENTDIMENSION5EXT": "Shipping Line",
+    "INVENTDIMENSION6EXT": "Shipping Carrier",
+    "INVENTDIMENSION7EXT": "Contract number",
+    "INVENTDIMENSION8EXT": "Intended Customer Account",
+    "INVENTDIMENSION9EXT": "ItemID Ext 1",
+    "INVENTDIMENSION10EXT": "ItemID Ext 2",
+    "INVENTDIMENSION11EXT": "ItemID Ext 3",
+    "INVENTDIMENSION12EXT": "UnitID",
+    "INVENTDIMENSION13EXT": "Produce Grade",
+    "INVENTDIMENSION14EXT": "Produce Variety",
+    "INVENTDIMENSION15EXT": "Produce Size",
+    "INVENTDIMENSION16EXT": "Produce Count",
+    "INVENTDIMENSION17EXT": "Produce Color",
+    "INVENTDIMENSION18EXT": "Country Region",
+    "INVENTDIMENSION19EXT": "Brand Mark",
+    "INVENTDIMENSION20EXT": "Distribution Packaging",
+    "INVENTDIMENSION21EXT": "Box Specification",
+    "INVENTDIMENSION22EXT": "Owner",
+    "INVENTDIMENSION23EXT": "Intended Retailer",
+    "INVENTDIMENSION24EXT": "Grower ID",
+    "INVENTDIMENSION25EXT": "Supplier Packhouse",
+    "INVENTDIMENSION26EXT": "Multi-GGN Grower",
 
-// Generate full target list with 'Ext' suffixes for Supplier Section
-let ALL_TARGET_FIELDS = [];
-BASE_FIELDS.forEach(f => ALL_TARGET_FIELDS.push(`${f}Ext`));
-ALL_TARGET_FIELDS = ALL_TARGET_FIELDS.concat(BASE_FIELDS);
+
+    // D365 Core Fields
+    "WEEK": "Week",
+    "WAREHOUSE": "Warehouse",
+    "VOYAGE": "Voyage",
+    "VESSEL": "Vessel",
+    "VENDORACCOUNT": "Vendor Account",
+    "UNITID": "Unit ID",
+    "TEMPTALENUMBER": "TemTale Number",
+    "SUPPLIERPACKHOUSE": "Supplier Packhouse",
+    "SHIPPINGLINE": "Shipping Line",
+    "SHIPPINGCARRIER": "Shipping Carrier",
+    "SEAL": "Seal",
+    "QTY": "Qty",
+    "PRODUCEVARIETY": "Produce Variety",
+    "PRODUCESIZE": "Produce Size",
+    "PRODUCEGRADE": "Produce Grade",
+    "PRODUCECOUNT": "Produce Count",
+    "PRODUCECOLOR": "Produce Color",
+    "PONUMBER": "PO Number",
+    "PDSVENDBATCHID": "PDS Vend Batch ID",
+    "PALLETID": "Pallet ID",
+    "PACKINGDATE": "Packing Date",
+    "OWNER": "Owner",
+    "ORIGINALDEPARTUREDATE": "Original Departure Date",
+    "ONSITEDELIVERYDATE": "On Site Delivery Date",
+    "NUMBEROFPALLET": "Number of Pallets",
+    "MULTIGGNGROWER": "Multi-GGN Grower",
+    "LOADINGPORTID": "Loading Port ID",
+    "LINESTATUS": "Line Status",
+    "LINENUMBER": "Line Number",
+    "ITEMID": "Item ID",
+    "INTENDEDRETAILER": "Intended Retailer",
+    "INTENDEDCUSTOMERACCOUNT": "Intended Customer Account",
+    "HARVESTDATE": "Harvest Date",
+    "GUIDX": "GUID",
+    "GROWERID": "Grower ID",
+    "GGNNUMBER": "GGN Number",
+    "ETHYLENEABSORBERLOCATION": "Ethylene Absorber Location",
+    "ERRORLOG": "Error Log",
+    "DISTRIBUTIONPACKAGING": "Distribution Packaging",
+    "DEPARTUREDATE": "Departure Date",
+    "DEPARTMENTCODE": "Department Code",
+    "COUNTRYREGION": "Country / Region",
+    "CONTRACTNUMBER": "Contract Number",
+    "CONTAINERID": "Container ID",
+    "BRANDMARK": "Brand / Mark",
+    "BOXSPECIFICATION": "Box Specification",
+    "BOOKINGREFERENCE": "Booking Reference",
+    "ARRIVALTIME": "Arrival Time",
+    "ARRIVALPORT": "Arrival Port",
+    "ARRIVALDATE": "Arrival Date"
+};
 
 let rawWorkbookData = {};
 let transformedPayloadData = [];
@@ -291,7 +330,6 @@ function renderSupplierDropdown() {
     const select = document.getElementById('supplierSelect');
     select.innerHTML = '<option value="">-- Select Supplier --</option>';
     
-    // Sort suppliers alphabetically by name
     supplierList.sort((a, b) => {
         const nameA = (a.VendorName || "").toLowerCase();
         const nameB = (b.VendorName || "").toLowerCase();
@@ -302,7 +340,7 @@ function renderSupplierDropdown() {
         const acc = sup.VendorAccount || "";
         const name = sup.VendorName || acc;
         if (acc) {
-            select.innerHTML += `<option value="${acc}">${name} (${acc})</option>`;
+            select.innerHTML += `<option value="${acc}">${name} | ${acc}</option>`;
         }
     });
 }
@@ -314,13 +352,6 @@ async function loadDataverseVendorProfiles(isManual = false) {
         if (res.ok) rawData = await res.json();
     } catch (apiErr) {
         console.warn('API Connection failed:', apiErr);
-    }
-
-    if (!rawData) {
-        try {
-            const localRes = await fetch('./vendor_mappings.json');
-            if (localRes.ok) rawData = await localRes.json();
-        } catch (localErr) {}
     }
 
     if (!rawData) {
@@ -357,13 +388,6 @@ async function loadStorageLocations() {
         if (res.ok) rawData = await res.json();
     } catch (err) {}
 
-    if (!rawData) {
-        try {
-            const sRes = await fetch('./storage_locations.json');
-            if (sRes.ok) rawData = await sRes.json();
-        } catch (err) {}
-    }
-
     storageLocations = Array.isArray(rawData) ? rawData : (rawData ? rawData.value || rawData.body || [] : []);
     if (availableSourceColumns.length > 0) renderMappingControls();
 }
@@ -388,7 +412,6 @@ function getUniqueWarehouses() {
         }
     });
 
-    // Sort warehouses ascending by code
     return list.sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true, sensitivity: 'base' }));
 }
 
@@ -485,17 +508,16 @@ function renderRawPreview() {
     container.innerHTML = tableHtml;
 }
 
-function buildGridHtml(fields, isSupplierGroup = false) {
+function buildGridHtml(fields) {
     const selectedSheet = document.getElementById('rawSheetSelect').value;
     const sampleRow = (rawWorkbookData[selectedSheet] && rawWorkbookData[selectedSheet][0]) ? rawWorkbookData[selectedSheet][0] : {};
     const warehouses = getUniqueWarehouses();
 
     let gridHtml = '';
-    fields.forEach(baseField => {
-        const fieldKey = isSupplierGroup ? `${baseField}Ext` : baseField;
+    fields.forEach(targetField => {
         let optionsHtml = `<option value="[ Ignore Field ]">[ Ignore Field ]</option>`;
         
-        if (baseField === "Warehouse") {
+        if (targetField === "WAREHOUSE") {
             optionsHtml += `<optgroup label="Static Warehouse Selection">`;
             warehouses.forEach(wh => {
                 optionsHtml += `<option value="STATIC:${wh.code}">Static: ${wh.code} | ${wh.name}</option>`;
@@ -507,22 +529,20 @@ function buildGridHtml(fields, isSupplierGroup = false) {
             const sampleValue = sampleRow[srcCol] !== undefined ? String(sampleRow[srcCol]).trim() : '';
             const previewText = sampleValue ? ` (e.g. "${sampleValue.substring(0, 18)}")` : ' (empty)';
             
-            const matchTarget = isSupplierGroup ? `${baseField.toLowerCase()}ext` : baseField.toLowerCase();
-            const isMatch = srcCol.toLowerCase().replace(/[^a-z0-9]/g, '') === matchTarget.replace(/[^a-z0-9]/g, '');
+            const isMatch = srcCol.toLowerCase().replace(/[^a-z0-9]/g, '') === targetField.toLowerCase().replace(/[^a-z0-9]/g, '');
             optionsHtml += `<option value="${srcCol}" ${isMatch ? 'selected' : ''}>${srcCol}${previewText}</option>`;
         });
 
-        if (baseField === "Warehouse") {
+        if (targetField === "WAREHOUSE") {
             optionsHtml += `</optgroup>`;
         }
 
-        const rawLabel = FIELD_LABELS[baseField] || baseField;
-        const displayLabel = isSupplierGroup ? `${rawLabel} (Supplier Ext)` : rawLabel;
+        const displayLabel = FIELD_LABELS[targetField] || targetField;
 
         gridHtml += `
             <div class="map-box">
                 <label>${displayLabel}</label>
-                <select id="map_${fieldKey}" onchange="applyMapping()" style="width:100%;">${optionsHtml}</select>
+                <select id="map_${targetField}" onchange="applyMapping()" style="width:100%;">${optionsHtml}</select>
             </div>
         `;
     });
@@ -531,8 +551,8 @@ function buildGridHtml(fields, isSupplierGroup = false) {
 }
 
 function renderMappingControls() {
-    document.getElementById('supplierMappingGrid').innerHTML = buildGridHtml(BASE_FIELDS, true);
-    document.getElementById('d365MappingGrid').innerHTML = buildGridHtml(BASE_FIELDS, false);
+    document.getElementById('supplierMappingGrid').innerHTML = buildGridHtml(SUPPLIER_FIELDS);
+    document.getElementById('d365MappingGrid').innerHTML = buildGridHtml(D365_FIELDS);
 }
 
 function autoDetectProfile() {
@@ -578,7 +598,7 @@ function onProfileChange() {
         const matchedOption = Array.from(select.options).find(opt => 
             opt.value.toLowerCase().trim() === String(savedSourceCol).toLowerCase().trim()
         );
-        select.value = matchedOption ? matchedOption.value : "[ Ignore Field ]";
+        select.value = matchedOption ? matchedOption.value : (savedSourceCol.startsWith("STATIC:") ? savedSourceCol : "[ Ignore Field ]");
     });
 
     applyMapping();
@@ -600,8 +620,6 @@ async function saveVendorProfile() {
         if (val !== "[ Ignore Field ]") {
             payload[dvKey] = val;
             localMapping[field] = val;
-        } else {
-            payload[dvKey] = "";
         }
     });
 
@@ -618,7 +636,9 @@ async function saveVendorProfile() {
             document.getElementById('profileSelect').value = vendorAccount;
             alert(`Profile for '${vendorAccount}' successfully saved to Dataverse!`);
         } else {
-            alert(`Error saving to Dataverse: HTTP ${res.status}`);
+            const errText = await res.text();
+            console.error("HTTP 400 Payload Body Error Details:", errText);
+            alert(`Error saving to Dataverse: HTTP ${res.status}\nCheck Developer Tools Console (F12) for flow details.`);
         }
     } catch (err) {
         alert(`Connection failed: ${err.message}`);
@@ -673,9 +693,7 @@ function renderPreview() {
 
     let tableHtml = `<div class="table-scroll"><table><thead><tr>`;
     ALL_TARGET_FIELDS.forEach(f => {
-        const base = f.endsWith("Ext") ? f.slice(0, -3) : f;
-        const rawLabel = FIELD_LABELS[base] || base;
-        const label = f.endsWith("Ext") ? `${rawLabel} (Ext)` : rawLabel;
+        const label = FIELD_LABELS[f] || f;
         tableHtml += `<th>${label}</th>`;
     });
     tableHtml += `</tr></thead><tbody>`;
