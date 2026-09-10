@@ -216,38 +216,45 @@ const D365_FIELDS = [
     "ERRORLOG"
 ];
 
+// Explicit Date Fields list for formatting enforcement
+const DATE_FIELDS = [
+    "ARRIVALDATE", "DEPARTUREDATE", "HARVESTDATE", "PACKINGDATE", 
+    "ORIGINALDEPARTUREDATE", "ONSITEDELIVERYDATE", 
+    "INVENTDIMENSION7EXT", "INVENTDIMENSION22EXT"
+];
+
 // Master collection of target fields
 const ALL_TARGET_FIELDS = [...SUPPLIER_FIELDS, ...D365_FIELDS];
 
-// Display Labels Map
+// Display Labels Map (Updated SUPPLIER_FIELDS 1-26 to match image labels exactly)
 const FIELD_LABELS = {
     // Supplier Mapping (Invent Dimensions 1-26)
-    "INVENTDIMENSION1EXT": "Invent Dimension 1 (Supplier Name)",
-    "INVENTDIMENSION2EXT": "Invent Dimension 2 (Vessel Name)",
-    "INVENTDIMENSION3EXT": "Invent Dimension 3",
-    "INVENTDIMENSION4EXT": "Invent Dimension 4",
-    "INVENTDIMENSION5EXT": "Invent Dimension 5",
-    "INVENTDIMENSION6EXT": "Invent Dimension 6",
-    "INVENTDIMENSION7EXT": "Invent Dimension 7 (ETD)",
-    "INVENTDIMENSION8EXT": "Invent Dimension 8 (Variety)",
-    "INVENTDIMENSION9EXT": "Invent Dimension 9 (Country of Origin)",
-    "INVENTDIMENSION10EXT": "Invent Dimension 10 (Number of Boxes)",
-    "INVENTDIMENSION11EXT": "Invent Dimension 11 (Country of Origin)",
-    "INVENTDIMENSION12EXT": "Invent Dimension 12 (Organic / Conventional)",
-    "INVENTDIMENSION13EXT": "Invent Dimension 13 (Vessel Name)",
-    "INVENTDIMENSION14EXT": "Invent Dimension 14 (Supplier Name)",
-    "INVENTDIMENSION15EXT": "Invent Dimension 15 (Container Number)",
-    "INVENTDIMENSION16EXT": "Invent Dimension 16 (Customer Name)",
-    "INVENTDIMENSION17EXT": "Invent Dimension 17 (Customer Name)",
-    "INVENTDIMENSION18EXT": "Invent Dimension 18 (Customer Name)",
-    "INVENTDIMENSION19EXT": "Invent Dimension 19 (Temp Tale Location)",
-    "INVENTDIMENSION20EXT": "Invent Dimension 20 (Container Number)",
-    "INVENTDIMENSION21EXT": "Invent Dimension 21 (Customer Name)",
-    "INVENTDIMENSION22EXT": "Invent Dimension 22 (ETD)",
-    "INVENTDIMENSION23EXT": "Invent Dimension 23 (Supplier Name)",
-    "INVENTDIMENSION24EXT": "Invent Dimension 24 (Container Number)",
-    "INVENTDIMENSION25EXT": "Invent Dimension 25 (Organic / Conventional)",
-    "INVENTDIMENSION26EXT": "Invent Dimension 26 (Container Number)",
+    "INVENTDIMENSION1EXT": "Arrival Port",
+    "INVENTDIMENSION2EXT": "Loading Port ID",
+    "INVENTDIMENSION3EXT": "Warehouse",
+    "INVENTDIMENSION4EXT": "Vendor Account",
+    "INVENTDIMENSION5EXT": "Shipping Line",
+    "INVENTDIMENSION6EXT": "Shipping Carrier",
+    "INVENTDIMENSION7EXT": "Contract number",
+    "INVENTDIMENSION8EXT": "Intended Customer Account",
+    "INVENTDIMENSION9EXT": "ItemID Ext 1",
+    "INVENTDIMENSION10EXT": "ItemID Ext 2",
+    "INVENTDIMENSION11EXT": "ItemID Ext 3",
+    "INVENTDIMENSION12EXT": "UnitID",
+    "INVENTDIMENSION13EXT": "Produce Grade",
+    "INVENTDIMENSION14EXT": "Produce Variety",
+    "INVENTDIMENSION15EXT": "Produce Size",
+    "INVENTDIMENSION16EXT": "Produce Count",
+    "INVENTDIMENSION17EXT": "Produce Color",
+    "INVENTDIMENSION18EXT": "Country Region",
+    "INVENTDIMENSION19EXT": "Brand Mark",
+    "INVENTDIMENSION20EXT": "Distribution Packaging",
+    "INVENTDIMENSION21EXT": "Box Specification",
+    "INVENTDIMENSION22EXT": "Owner",
+    "INVENTDIMENSION23EXT": "Intended Retailer",
+    "INVENTDIMENSION24EXT": "Grower ID",
+    "INVENTDIMENSION25EXT": "Supplier Packhouse",
+    "INVENTDIMENSION26EXT": "Multi-GGN Grower",
 
     // D365 Core Fields
     "ARRIVALPORT": "Arrival Port",
@@ -296,7 +303,10 @@ const FIELD_LABELS = {
     "DEPARTMENTCODE": "Department Code",
     "PDSVENDBATCHID": "PDS Vend Batch ID",
     "HARVESTDATE": "Harvest Date",
-    "LINENUMBER": "Line Number"
+    "LINENUMBER": "Line Number",
+    "GUIDX": "GUID",
+    "LINESTATUS": "Line Status",
+    "ERRORLOG": "Error Log"
 };
 
 let rawWorkbookData = {};
@@ -322,6 +332,31 @@ function updateUploadIdDisplay() {
     document.getElementById('uploadIdHeaderBadge').innerText = currentUploadId;
     document.getElementById('uploadIdPreviewBadge').innerText = currentUploadId;
     document.getElementById('headerUploadIdDisplay').style.display = 'inline-block';
+}
+
+function formatDateValue(val) {
+    if (!val) return "";
+    let dateObj = null;
+
+    if (typeof val === 'number' || (!isNaN(val) && !String(val).includes('-') && !String(val).includes('/'))) {
+        const num = parseFloat(val);
+        if (num > 25569) {
+            dateObj = new Date((num - (25567 + 2)) * 86400 * 1000);
+        }
+    }
+
+    if (!dateObj) {
+        dateObj = new Date(val);
+    }
+
+    if (dateObj && !isNaN(dateObj.getTime())) {
+        const yyyy = dateObj.getFullYear();
+        const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const dd = String(dateObj.getDate()).padStart(2, '0');
+        return `${yyyy}-${mm}-${dd}`;
+    }
+
+    return String(val).trim();
 }
 
 function getProp(obj, possibleKeys) {
@@ -472,7 +507,7 @@ function handleFile() {
     const reader = new FileReader();
     reader.onload = function(evt) {
         const data = new Uint8Array(evt.target.result);
-        const workbook = XLSX.read(data, { type: 'array' });
+        const workbook = XLSX.read(data, { type: 'array', cellDates: true });
         
         rawWorkbookData = {};
         const sheetSelect = document.getElementById('rawSheetSelect');
@@ -538,7 +573,11 @@ function renderRawPreview() {
 
     rows.slice(0, 5).forEach(row => {
         tableHtml += '<tr>';
-        headers.forEach(h => tableHtml += `<td>${row[h] !== undefined ? row[h] : ''}</td>`);
+        headers.forEach(h => {
+            let val = row[h] !== undefined ? row[h] : '';
+            if (val instanceof Date) val = formatDateValue(val);
+            tableHtml += `<td>${val}</td>`;
+        });
         tableHtml += '</tr>';
     });
     tableHtml += '</tbody></table>';
@@ -563,8 +602,14 @@ function buildGridHtml(fields) {
         }
 
         availableSourceColumns.forEach(srcCol => {
-            const sampleValue = sampleRow[srcCol] !== undefined ? String(sampleRow[srcCol]).trim() : '';
-            const previewText = sampleValue ? ` (e.g. "${sampleValue.substring(0, 18)}")` : ' (empty)';
+            let sampleValue = sampleRow[srcCol] !== undefined ? sampleRow[srcCol] : '';
+            if (DATE_FIELDS.includes(targetField) || sampleValue instanceof Date) {
+                sampleValue = formatDateValue(sampleValue);
+            } else {
+                sampleValue = String(sampleValue).trim();
+            }
+
+            const previewText = sampleValue ? ` (e.g. "${String(sampleValue).substring(0, 18)}")` : ' (empty)';
             
             const isMatch = srcCol.toLowerCase().replace(/[^a-z0-9]/g, '') === targetField.toLowerCase().replace(/[^a-z0-9]/g, '');
             optionsHtml += `<option value="${srcCol}" ${isMatch ? 'selected' : ''}>${srcCol}${previewText}</option>`;
@@ -702,7 +747,12 @@ function applyMapping() {
                 if (src.startsWith("STATIC:")) {
                     transformedRow[target] = src.replace("STATIC:", "");
                 } else {
-                    transformedRow[target] = row[src] !== undefined && row[src] !== null ? String(row[src]).trim() : "";
+                    let val = row[src] !== undefined && row[src] !== null ? row[src] : "";
+                    if (DATE_FIELDS.includes(target) || val instanceof Date) {
+                        transformedRow[target] = formatDateValue(val);
+                    } else {
+                        transformedRow[target] = String(val).trim();
+                    }
                 }
             } else {
                 transformedRow[target] = "";
