@@ -162,7 +162,7 @@ const FETCH_SUPPLIERS_URL = "https://b1a78497e32be5af85a1519f752e3d.4b.environme
 // Supplier Target Fields (INVENTDIMENSION1EXT through INVENTDIMENSION26EXT)
 const SUPPLIER_FIELDS = Array.from({ length: 26 }, (_, i) => `INVENTDIMENSION${i + 1}EXT`);
 
-// Custom Ordered D365 Target Fields
+// Custom Ordered D365 Target Fields (Updated: Added EXTERNALREFERENCE after ARRIVALTIME, removed deprecated system fields)
 const D365_FIELDS = [
     "ARRIVALPORT",
     "VESSEL",
@@ -173,6 +173,7 @@ const D365_FIELDS = [
     "WEEK",
     "ARRIVALDATE",
     "ARRIVALTIME",
+    "EXTERNALREFERENCE",
     "WAREHOUSE",
     "ONSITEDELIVERYDATE",
     "CONTAINERID",
@@ -208,12 +209,7 @@ const D365_FIELDS = [
     "SEAL",
     "MULTIGGNGROWER",
     "DEPARTMENTCODE",
-    "PDSVENDBATCHID",
-    "HARVESTDATE",
-    "LINENUMBER",
-    "GUIDX",
-    "LINESTATUS",
-    "ERRORLOG"
+    "HARVESTDATE"
 ];
 
 // Explicit Date Fields list for formatting enforcement
@@ -226,7 +222,7 @@ const DATE_FIELDS = [
 // Master collection of target fields
 const ALL_TARGET_FIELDS = [...SUPPLIER_FIELDS, ...D365_FIELDS];
 
-// Display Labels Map (Updated SUPPLIER_FIELDS 1-26 to match image labels exactly)
+// Display Labels Map
 const FIELD_LABELS = {
     // Supplier Mapping (Invent Dimensions 1-26)
     "INVENTDIMENSION1EXT": "Arrival Port",
@@ -266,6 +262,7 @@ const FIELD_LABELS = {
     "WEEK": "Week",
     "ARRIVALDATE": "Arrival Date",
     "ARRIVALTIME": "Arrival Time",
+    "EXTERNALREFERENCE": "External Reference",
     "WAREHOUSE": "Warehouse",
     "ONSITEDELIVERYDATE": "On Site Delivery Date",
     "CONTAINERID": "Container ID",
@@ -301,12 +298,7 @@ const FIELD_LABELS = {
     "SEAL": "Seal",
     "MULTIGGNGROWER": "Multi-GGN Grower",
     "DEPARTMENTCODE": "Department Code",
-    "PDSVENDBATCHID": "PDS Vend Batch ID",
-    "HARVESTDATE": "Harvest Date",
-    "LINENUMBER": "Line Number",
-    "GUIDX": "GUID",
-    "LINESTATUS": "Line Status",
-    "ERRORLOG": "Error Log"
+    "HARVESTDATE": "Harvest Date"
 };
 
 let rawWorkbookData = {};
