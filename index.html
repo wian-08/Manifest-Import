@@ -162,7 +162,7 @@ const FETCH_SUPPLIERS_URL = "https://b1a78497e32be5af85a1519f752e3d.4b.environme
 // Supplier Target Fields (INVENTDIMENSION1EXT through INVENTDIMENSION26EXT)
 const SUPPLIER_FIELDS = Array.from({ length: 26 }, (_, i) => `INVENTDIMENSION${i + 1}EXT`);
 
-// Custom Ordered D365 Target Fields (Updated: Added EXTERNALREFERENCE after ARRIVALTIME, removed deprecated system fields)
+// Custom Ordered D365 Target Fields
 const D365_FIELDS = [
     "ARRIVALPORT",
     "VESSEL",
@@ -314,9 +314,25 @@ document.getElementById('fileInput').addEventListener('change', handleFile);
 document.getElementById('headerOffset').addEventListener('change', handleFile);
 
 function generateUploadId() {
-    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    const randomSuffix = Math.random().toString(36).substring(2, 7).toUpperCase();
-    return `UPL-${dateStr}-${randomSuffix}`;
+    const fileInput = document.getElementById('fileInput');
+    const file = fileInput.files[0];
+    
+    // Get YYYYMMDD date prefix (9 characters with underscore)
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    const prefix = `${yyyy}${mm}${dd}_`;
+
+    if (file && file.name) {
+        // Max 50 characters: 50 - prefix length (9) = 41 chars for the file name
+        const remainingChars = 50 - prefix.length;
+        const truncatedFileName = file.name.substring(0, remainingChars);
+        return `${prefix}${truncatedFileName}`;
+    }
+
+    // Default fallback if no file is selected
+    return `UPL-${prefix.slice(0, -1)}`.substring(0, 50);
 }
 
 function updateUploadIdDisplay() {
@@ -488,10 +504,9 @@ function handleFile() {
     const file = fileInput.files[0];
     if (!file) return;
 
-    if (!currentUploadId) {
-        currentUploadId = generateUploadId();
-        updateUploadIdDisplay();
-    }
+    // Regenerate Upload ID on file change
+    currentUploadId = generateUploadId();
+    updateUploadIdDisplay();
 
     const userRowInput = parseInt(document.getElementById('headerOffset').value) || 1;
     const sheetRangeOffset = Math.max(0, userRowInput - 1);
@@ -798,7 +813,7 @@ async function uploadPayload() {
 
     const payload = {
         uploadId: currentUploadId,
-        fileName: file.name,
+        fileName: file ? file.name : "",
         templateType: "TD_IntakeArrivalLineStaging",
         vendorProfile: document.getElementById('supplierSelect').value || document.getElementById('profileSelect').value || "Custom",
         data: transformedPayloadData
@@ -811,8 +826,13 @@ async function uploadPayload() {
             body: JSON.stringify(payload)
         });
 
-        if (res.ok) alert(`Successfully uploaded payload!\n\nUpload ID: ${currentUploadId}`);
-        else alert(`Error uploading: HTTP ${res.status}`);
+        if (res.ok) {
+            alert(`Payload successfully uploaded! Upload ID: ${currentUploadId}`);
+        } else {
+            const errText = await res.text();
+            console.error("Upload error details:", errText);
+            alert(`Failed to upload to D365 flow: HTTP ${res.status}`);
+        }
     } catch (err) {
         alert(`Connection failed: ${err.message}`);
     }
