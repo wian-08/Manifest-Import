@@ -11,7 +11,7 @@
         .card { background: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); margin-bottom: 20px; border: 1px solid #e1e4e8; }
         .flex { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
         .between { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; margin-top: 10px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; margin-top: 10px; }
         .map-box { background: #f8f9fa; padding: 10px; border: 1px solid #e0e0e0; border-radius: 6px; }
         .map-box label { font-size: 12px; font-weight: 700; color: #0078d4; display: block; margin-bottom: 4px; }
         select, input, button { padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
@@ -21,6 +21,9 @@
         button:disabled { background: #cccccc; cursor: not-allowed; }
         .btn-secondary { background: #6c757d; }
         .btn-secondary:hover { background: #5a6268; }
+        .btn-danger { background: #d9534f; }
+        .btn-danger:hover { background: #c9302c; }
+        .btn-sm { padding: 4px 8px; font-size: 12px; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; background: #fff; }
         th, td { border: 1px solid #e1e4e8; padding: 8px; text-align: left; font-size: 12px; white-space: nowrap; }
         th { background: #f0f2f5; font-weight: 600; color: #444; }
@@ -29,7 +32,6 @@
         .badge-id { background: #107c41; color: white; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; font-family: monospace; }
         .section-header { margin-top: 15px; margin-bottom: 12px; color: #0078d4; font-size: 15px; border-bottom: 2px solid #e0e0e0; padding-bottom: 4px; }
         
-        /* Collapsible Accordion Styles */
         .collapsible-header {
             background-color: #eef3f8;
             color: #0078d4;
@@ -51,6 +53,34 @@
         .collapsible-content { display: none; padding-top: 5px; }
         .collapsible-content.active { display: block; }
         .toggle-icon { font-size: 12px; margin-left: 10px; }
+
+        .sub-table-card {
+            background: #ffffff;
+            border: 1px dashed #0078d4;
+            border-radius: 6px;
+            padding: 12px;
+            margin-top: 12px;
+        }
+        .sub-preview-box {
+            background: #fafafa;
+            border: 1px solid #d0d7de;
+            border-radius: 6px;
+            padding: 10px;
+            margin-top: 12px;
+        }
+        .autofill-container {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 6px;
+            font-size: 11px;
+            color: #444;
+            font-weight: 600;
+        }
+        .autofill-container input[type="checkbox"] {
+            margin: 0;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -66,28 +96,62 @@
     </div>
     <div class="flex">
         <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" />
-        <label>Header Start Row: 
-            <input type="number" id="headerOffset" value="1" min="1" style="width:60px;">
-        </label>
         <button id="uploadBtn" disabled onclick="uploadPayload()">Confirm & Upload to D365</button>
     </div>
 </div>
 
-<!-- 2. RAW UNMAPPED FILE PREVIEW -->
+<!-- 2. TABLE STRUCTURE & LAYOUT CONFIGURATION -->
+<div class="card" id="tableConfigCard" style="display:none;">
+    <div class="between">
+        <h3>📐 Table Boundaries & Sub-Table Configuration</h3>
+        <button class="btn-secondary btn-sm" onclick="applyTableConfigurations()">🔄 Re-parse Tables</button>
+    </div>
+
+    <!-- Main Table Spec -->
+    <div class="map-box" style="margin-top: 10px;">
+        <h4 style="margin: 0 0 8px 0; color: #107c41;">Main Data Table Bounds</h4>
+        <div class="flex">
+            <label>Header Row: 
+                <input type="number" id="mainHeaderRow" value="14" min="1" style="width:65px;">
+            </label>
+            <label>Data Start Row: 
+                <input type="number" id="mainDataStartRow" value="15" min="1" style="width:65px;">
+            </label>
+            <label>Data End Row (Optional): 
+                <input type="number" id="mainDataEndRow" placeholder="Auto" style="width:75px;">
+            </label>
+        </div>
+    </div>
+
+    <!-- Sub Tables Spec -->
+    <div class="map-box" style="margin-top: 15px;">
+        <div class="between">
+            <h4 style="margin: 0; color: #0078d4;">Sub-Tables Setup (Horizontal or Vertical Header/Value Blocks)</h4>
+            <button class="btn-sm" onclick="addSubTableConfig()">+ Add Sub-Table</button>
+        </div>
+        <div id="subTableConfigsContainer"></div>
+    </div>
+</div>
+
+<!-- 3. RAW PREVIEW PER TABLE -->
 <div class="card" id="rawPreviewCard" style="display:none;">
     <div class="between">
-        <h3>👁️ Raw File Preview (First 5 Rows)</h3>
+        <h3>👁️ Raw File Preview</h3>
         <div class="flex">
-            <label><strong>Active Data Sheet:</strong></label>
+            <label><strong>Active Sheet:</strong></label>
             <select id="rawSheetSelect" onchange="onSheetChange()"></select>
         </div>
     </div>
-    <div id="rawPreviewContainer" class="table-scroll"></div>
+
+    <div style="margin-top: 15px;">
+        <h4 style="color: #107c41; margin-bottom: 5px;">Main Table Raw Preview (First 5 Rows)</h4>
+        <div id="mainTablePreviewContainer" class="table-scroll"></div>
+    </div>
 </div>
 
-<!-- 3. CONFIGURATION: VENDOR & MAPPING -->
+<!-- 4. CONFIGURATION: VENDOR & MAPPING -->
 <div class="card" id="mappingCard" style="display:none;">
-    <h3>🛠️ Ingestion Configuration & Column Mapping</h3>
+    <h3>🛠 Ingestion Configuration & Column Mapping</h3>
     
     <!-- Vendor Profile Controls -->
     <div class="map-box" style="margin-bottom: 15px;">
@@ -125,7 +189,7 @@
     </div>
 </div>
 
-<!-- 4. TRANSFORMED PAYLOAD PREVIEW -->
+<!-- 5. TRANSFORMED PAYLOAD PREVIEW -->
 <div class="card" id="previewCard" style="display:none;">
     <div class="between">
         <h3> Transformed Payload Preview (Unified Output)</h3>
@@ -164,52 +228,16 @@ const SUPPLIER_FIELDS = Array.from({ length: 26 }, (_, i) => `INVENTDIMENSION${i
 
 // Custom Ordered D365 Target Fields
 const D365_FIELDS = [
-    "ARRIVALPORT",
-    "VESSEL",
-    "VOYAGE",
-    "LOADINGPORTID",
-    "ORIGINALDEPARTUREDATE",
-    "DEPARTUREDATE",
-    "WEEK",
-    "ARRIVALDATE",
-    "ARRIVALTIME",
-    "EXTERNALREFERENCE",
-    "WAREHOUSE",
-    "ONSITEDELIVERYDATE",
-    "CONTAINERID",
-    "BOOKINGREFERENCE",
-    "VENDORACCOUNT",
-    "PONUMBER",
-    "SHIPPINGLINE",
-    "SHIPPINGCARRIER",
-    "CONTRACTNUMBER",
-    "INTENDEDCUSTOMERACCOUNT",
-    "ITEMID",
-    "QTY",
-    "UNITID",
-    "PRODUCEGRADE",
-    "PRODUCEVARIETY",
-    "PRODUCESIZE",
-    "PRODUCECOUNT",
-    "PRODUCECOLOR",
-    "COUNTRYREGION",
-    "BRANDMARK",
-    "DISTRIBUTIONPACKAGING",
-    "BOXSPECIFICATION",
-    "OWNER",
-    "INTENDEDRETAILER",
-    "PALLETID",
-    "NUMBEROFPALLET",
-    "TEMPTALENUMBER",
-    "ETHYLENEABSORBERLOCATION",
-    "GROWERID",
-    "GGNNUMBER",
-    "PACKINGDATE",
-    "SUPPLIERPACKHOUSE",
-    "SEAL",
-    "MULTIGGNGROWER",
-    "DEPARTMENTCODE",
-    "HARVESTDATE"
+    "ARRIVALPORT", "VESSEL", "VOYAGE", "LOADINGPORTID", "ORIGINALDEPARTUREDATE",
+    "DEPARTUREDATE", "WEEK", "ARRIVALDATE", "ARRIVALTIME", "EXTERNALREFERENCE",
+    "WAREHOUSE", "ONSITEDELIVERYDATE", "CONTAINERID", "BOOKINGREFERENCE",
+    "VENDORACCOUNT", "PONUMBER", "SHIPPINGLINE", "SHIPPINGCARRIER", "CONTRACTNUMBER",
+    "INTENDEDCUSTOMERACCOUNT", "ITEMID", "QTY", "UNITID", "PRODUCEGRADE",
+    "PRODUCEVARIETY", "PRODUCESIZE", "PRODUCECOUNT", "PRODUCECOLOR", "COUNTRYREGION",
+    "BRANDMARK", "DISTRIBUTIONPACKAGING", "BOXSPECIFICATION", "OWNER", "INTENDEDRETAILER",
+    "PALLETID", "NUMBEROFPALLET", "TEMPTALENUMBER", "ETHYLENEABSORBERLOCATION",
+    "GROWERID", "GGNNUMBER", "PACKINGDATE", "SUPPLIERPACKHOUSE", "SEAL",
+    "MULTIGGNGROWER", "DEPARTMENTCODE", "HARVESTDATE"
 ];
 
 // Explicit Date Fields list for formatting enforcement
@@ -224,84 +252,52 @@ const ALL_TARGET_FIELDS = [...SUPPLIER_FIELDS, ...D365_FIELDS];
 
 // Display Labels Map
 const FIELD_LABELS = {
-    // Supplier Mapping (Invent Dimensions 1-26)
-    "INVENTDIMENSION1EXT": "Arrival Port",
-    "INVENTDIMENSION2EXT": "Loading Port ID",
-    "INVENTDIMENSION3EXT": "Warehouse",
-    "INVENTDIMENSION4EXT": "Vendor Account",
-    "INVENTDIMENSION5EXT": "Shipping Line",
-    "INVENTDIMENSION6EXT": "Shipping Carrier",
-    "INVENTDIMENSION7EXT": "Contract number",
-    "INVENTDIMENSION8EXT": "Intended Customer Account",
-    "INVENTDIMENSION9EXT": "ItemID Ext 1",
-    "INVENTDIMENSION10EXT": "ItemID Ext 2",
-    "INVENTDIMENSION11EXT": "ItemID Ext 3",
-    "INVENTDIMENSION12EXT": "UnitID",
-    "INVENTDIMENSION13EXT": "Produce Grade",
-    "INVENTDIMENSION14EXT": "Produce Variety",
-    "INVENTDIMENSION15EXT": "Produce Size",
-    "INVENTDIMENSION16EXT": "Produce Count",
-    "INVENTDIMENSION17EXT": "Produce Color",
-    "INVENTDIMENSION18EXT": "Country Region",
-    "INVENTDIMENSION19EXT": "Brand Mark",
-    "INVENTDIMENSION20EXT": "Distribution Packaging",
-    "INVENTDIMENSION21EXT": "Box Specification",
-    "INVENTDIMENSION22EXT": "Owner",
-    "INVENTDIMENSION23EXT": "Intended Retailer",
-    "INVENTDIMENSION24EXT": "Grower ID",
-    "INVENTDIMENSION25EXT": "Supplier Packhouse",
-    "INVENTDIMENSION26EXT": "Multi-GGN Grower",
-
-    // D365 Core Fields
-    "ARRIVALPORT": "Arrival Port",
-    "VESSEL": "Vessel",
-    "VOYAGE": "Voyage",
-    "LOADINGPORTID": "Loading Port ID",
-    "ORIGINALDEPARTUREDATE": "Original Departure Date",
-    "DEPARTUREDATE": "Departure Date",
-    "WEEK": "Week",
-    "ARRIVALDATE": "Arrival Date",
-    "ARRIVALTIME": "Arrival Time",
-    "EXTERNALREFERENCE": "External Reference",
-    "WAREHOUSE": "Warehouse",
-    "ONSITEDELIVERYDATE": "On Site Delivery Date",
-    "CONTAINERID": "Container ID",
-    "BOOKINGREFERENCE": "Booking Reference",
-    "VENDORACCOUNT": "Vendor Account",
-    "PONUMBER": "PO Number",
-    "SHIPPINGLINE": "Shipping Line",
-    "SHIPPINGCARRIER": "Shipping Carrier",
-    "CONTRACTNUMBER": "Contract Number",
-    "INTENDEDCUSTOMERACCOUNT": "Intended Customer Account",
-    "ITEMID": "Item ID",
-    "QTY": "Qty",
-    "UNITID": "Unit ID",
-    "PRODUCEGRADE": "Produce Grade",
-    "PRODUCEVARIETY": "Produce Variety",
-    "PRODUCESIZE": "Produce Size",
-    "PRODUCECOUNT": "Produce Count",
-    "PRODUCECOLOR": "Produce Color",
-    "COUNTRYREGION": "Country / Region",
-    "BRANDMARK": "Brand / Mark",
-    "DISTRIBUTIONPACKAGING": "Distribution Packaging",
-    "BOXSPECIFICATION": "Box Specification",
-    "OWNER": "Owner",
-    "INTENDEDRETAILER": "Intended Retailer",
-    "PALLETID": "Pallet ID",
-    "NUMBEROFPALLET": "Number of Pallets",
-    "TEMPTALENUMBER": "TemTale Number",
-    "ETHYLENEABSORBERLOCATION": "Ethylene Absorber Location",
-    "GROWERID": "Grower ID",
-    "GGNNUMBER": "GGN Number",
-    "PACKINGDATE": "Packing Date",
-    "SUPPLIERPACKHOUSE": "Supplier Packhouse",
-    "SEAL": "Seal",
-    "MULTIGGNGROWER": "Multi-GGN Grower",
-    "DEPARTMENTCODE": "Department Code",
+    "INVENTDIMENSION1EXT": "Arrival Port", "INVENTDIMENSION2EXT": "Loading Port ID",
+    "INVENTDIMENSION3EXT": "Warehouse", "INVENTDIMENSION4EXT": "Vendor Account",
+    "INVENTDIMENSION5EXT": "Shipping Line", "INVENTDIMENSION6EXT": "Shipping Carrier",
+    "INVENTDIMENSION7EXT": "Contract number", "INVENTDIMENSION8EXT": "Intended Customer Account",
+    "INVENTDIMENSION9EXT": "ItemID Ext 1", "INVENTDIMENSION10EXT": "ItemID Ext 2",
+    "INVENTDIMENSION11EXT": "ItemID Ext 3", "INVENTDIMENSION12EXT": "UnitID",
+    "INVENTDIMENSION13EXT": "Produce Grade", "INVENTDIMENSION14EXT": "Produce Variety",
+    "INVENTDIMENSION15EXT": "Produce Size", "INVENTDIMENSION16EXT": "Produce Count",
+    "INVENTDIMENSION17EXT": "Produce Color", "INVENTDIMENSION18EXT": "Country Region",
+    "INVENTDIMENSION19EXT": "Brand Mark", "INVENTDIMENSION20EXT": "Distribution Packaging",
+    "INVENTDIMENSION21EXT": "Box Specification", "INVENTDIMENSION22EXT": "Owner",
+    "INVENTDIMENSION23EXT": "Intended Retailer", "INVENTDIMENSION24EXT": "Grower ID",
+    "INVENTDIMENSION25EXT": "Supplier Packhouse", "INVENTDIMENSION26EXT": "Multi-GGN Grower",
+    "ARRIVALPORT": "Arrival Port", "VESSEL": "Vessel", "VOYAGE": "Voyage",
+    "LOADINGPORTID": "Loading Port ID", "ORIGINALDEPARTUREDATE": "Original Departure Date",
+    "DEPARTUREDATE": "Departure Date", "WEEK": "Week", "ARRIVALDATE": "Arrival Date",
+    "ARRIVALTIME": "Arrival Time", "EXTERNALREFERENCE": "External Reference",
+    "WAREHOUSE": "Warehouse", "ONSITEDELIVERYDATE": "On Site Delivery Date",
+    "CONTAINERID": "Container ID", "BOOKINGREFERENCE": "Booking Reference",
+    "VENDORACCOUNT": "Vendor Account", "PONUMBER": "PO Number", "SHIPPINGLINE": "Shipping Line",
+    "SHIPPINGCARRIER": "Shipping Carrier", "CONTRACTNUMBER": "Contract Number",
+    "INTENDEDCUSTOMERACCOUNT": "Intended Customer Account", "ITEMID": "Item ID",
+    "QTY": "Qty", "UNITID": "Unit ID", "PRODUCEGRADE": "Produce Grade",
+    "PRODUCEVARIETY": "Produce Variety", "PRODUCESIZE": "Produce Size",
+    "PRODUCECOUNT": "Produce Count", "PRODUCECOLOR": "Produce Color",
+    "COUNTRYREGION": "Country / Region", "BRANDMARK": "Brand / Mark",
+    "DISTRIBUTIONPACKAGING": "Distribution Packaging", "BOXSPECIFICATION": "Box Specification",
+    "OWNER": "Owner", "INTENDEDRETAILER": "Intended Retailer", "PALLETID": "Pallet ID",
+    "NUMBEROFPALLET": "Number of Pallets", "TEMPTALENUMBER": "TemTale Number",
+    "ETHYLENEABSORBERLOCATION": "Ethylene Absorber Location", "GROWERID": "Grower ID",
+    "GGNNUMBER": "GGN Number", "PACKINGDATE": "Packing Date",
+    "SUPPLIERPACKHOUSE": "Supplier Packhouse", "SEAL": "Seal",
+    "MULTIGGNGROWER": "Multi-GGN Grower", "DEPARTMENTCODE": "Department Code",
     "HARVESTDATE": "Harvest Date"
 };
 
-let rawWorkbookData = {};
+let rawWorksheetObjects = {};
+let parsedMainTableData = {};
+let parsedSubTablesData = {};
+let subTableConfigs = [
+    { name: "", orientation: "horizontal", startCell: "", endCell: "" },
+    { name: "", orientation: "horizontal", startCell: "", endCell: "" },
+    { name: "", orientation: "horizontal", startCell: "", endCell: "" }
+];
+
+let autoFillConfig = {};
 let transformedPayloadData = [];
 let availableSourceColumns = [];
 let vendorProfiles = {};
@@ -311,13 +307,10 @@ let currentUploadId = "";
 let currentSelectedSheet = "";
 
 document.getElementById('fileInput').addEventListener('change', handleFile);
-document.getElementById('headerOffset').addEventListener('change', handleFile);
 
 function generateUploadId() {
     const fileInput = document.getElementById('fileInput');
     const file = fileInput.files[0];
-    
-    // Get YYYYMMDD date prefix (9 characters with underscore)
     const today = new Date();
     const yyyy = today.getFullYear();
     const mm = String(today.getMonth() + 1).padStart(2, '0');
@@ -325,13 +318,10 @@ function generateUploadId() {
     const prefix = `${yyyy}${mm}${dd}_`;
 
     if (file && file.name) {
-        // Max 50 characters: 50 - prefix length (9) = 41 chars for the file name
         const remainingChars = 50 - prefix.length;
         const truncatedFileName = file.name.substring(0, remainingChars);
         return `${prefix}${truncatedFileName}`;
     }
-
-    // Default fallback if no file is selected
     return `UPL-${prefix.slice(0, -1)}`.substring(0, 50);
 }
 
@@ -343,7 +333,7 @@ function updateUploadIdDisplay() {
 }
 
 function formatDateValue(val) {
-    if (!val) return "";
+    if (!val && val !== 0) return "";
     let dateObj = null;
 
     if (typeof val === 'number' || (!isNaN(val) && !String(val).includes('-') && !String(val).includes('/'))) {
@@ -353,15 +343,27 @@ function formatDateValue(val) {
         }
     }
 
+    if (!dateObj && typeof val === 'string' && val.includes('/')) {
+        const parts = val.split('/');
+        if (parts.length === 3) {
+            const day = parseInt(parts[0], 10);
+            const month = parseInt(parts[1], 10) - 1;
+            const year = parseInt(parts[2], 10);
+            if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
+                dateObj = new Date(year, month, day);
+            }
+        }
+    }
+
     if (!dateObj) {
         dateObj = new Date(val);
     }
 
     if (dateObj && !isNaN(dateObj.getTime())) {
-        const yyyy = dateObj.getFullYear();
         const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
         const dd = String(dateObj.getDate()).padStart(2, '0');
-        return `${yyyy}-${mm}-${dd}`;
+        const yyyy = dateObj.getFullYear();
+        return `${mm}/${dd}/${yyyy}`;
     }
 
     return String(val).trim();
@@ -499,34 +501,121 @@ loadSuppliers();
 loadDataverseVendorProfiles(false);
 loadStorageLocations();
 
+// --- SUB-TABLE CONFIGURATION & INLINE PREVIEW HANDLERS ---
+function renderSubTableConfigs() {
+    const container = document.getElementById('subTableConfigsContainer');
+    container.innerHTML = '';
+
+    const sheetName = document.getElementById('rawSheetSelect') ? document.getElementById('rawSheetSelect').value : currentSelectedSheet;
+    const currentSheetSubTables = parsedSubTablesData[sheetName] || [];
+
+    subTableConfigs.forEach((cfg, index) => {
+        const matchedParsedSub = currentSheetSubTables.find(st => st.name === cfg.name);
+
+        let previewHtml = '';
+        if (cfg.name && matchedParsedSub) {
+            previewHtml += `<div class="sub-preview-box"><div class="between" style="margin-bottom: 6px;"><strong style="font-size:12px; color:#0078d4;">👁️ Live Sub-Table Preview (${cfg.name})</strong></div><div class="table-scroll">`;
+            if (matchedParsedSub.type === 'horizontal') {
+                previewHtml += '<table><thead><tr><th>Column / Header Name</th><th>Raw Value (No Autofill)</th></tr></thead><tbody>';
+                const entries = Object.entries(matchedParsedSub.data);
+                if (entries.length === 0) {
+                    previewHtml += '<tr><td colspan="2" style="color:#888;">No data extracted in cell range</td></tr>';
+                } else {
+                    entries.forEach(([k, v]) => {
+                        previewHtml += `<tr><td><strong>${k}</strong></td><td>${v}</td></tr>`;
+                    });
+                }
+                previewHtml += '</tbody></table>';
+            } else {
+                previewHtml += '<table><thead><tr>';
+                (matchedParsedSub.headers || []).forEach(h => previewHtml += `<th>${h}</th>`);
+                previewHtml += '</tr></thead><tbody>';
+                const rows = matchedParsedSub.data || [];
+                if (rows.length === 0) {
+                    previewHtml += `<tr><td colspan="${(matchedParsedSub.headers || []).length || 1}" style="color:#888;">No data extracted in cell range</td></tr>`;
+                } else {
+                    rows.forEach(row => {
+                        previewHtml += '<tr>';
+                        (matchedParsedSub.headers || []).forEach(h => previewHtml += `<td>${row[h] || ''}</td>`);
+                        previewHtml += '</tr>';
+                    });
+                }
+                previewHtml += '</tbody></table>';
+            }
+            previewHtml += '</div></div>';
+        }
+
+        container.innerHTML += `
+            <div class="sub-table-card">
+                <div class="between" style="margin-bottom: 8px;">
+                    <strong>Sub-Table #${index + 1} Configuration</strong>
+                    <button class="btn-danger btn-sm" onclick="removeSubTableConfig(${index})">Remove</button>
+                </div>
+                <div class="flex">
+                    <label>Name: 
+                        <input type="text" value="${cfg.name}" placeholder="Sub-Table Name" onchange="updateSubTableConfig(${index}, 'name', this.value)" style="width:130px;">
+                    </label>
+                    <label>Orientation: 
+                        <select onchange="updateSubTableConfig(${index}, 'orientation', this.value)">
+                            <option value="horizontal" ${cfg.orientation === 'horizontal' ? 'selected' : ''}>Horizontal (Header & Value Side-by-Side)</option>
+                            <option value="vertical" ${cfg.orientation === 'vertical' ? 'selected' : ''}>Vertical (Header Top, Rows Below)</option>
+                        </select>
+                    </label>
+                    <label>Start Cell: 
+                        <input type="text" value="${cfg.startCell}" placeholder="e.g. A7" onchange="updateSubTableConfig(${index}, 'startCell', this.value.toUpperCase())" style="width:75px;">
+                    </label>
+                    <label>End Cell: 
+                        <input type="text" value="${cfg.endCell}" placeholder="e.g. B12" onchange="updateSubTableConfig(${index}, 'endCell', this.value.toUpperCase())" style="width:75px;">
+                    </label>
+                </div>
+                ${previewHtml}
+            </div>
+        `;
+    });
+}
+
+function updateSubTableConfig(index, key, val) {
+    subTableConfigs[index][key] = val;
+    applyTableConfigurations();
+}
+
+function addSubTableConfig() {
+    subTableConfigs.push({
+        name: "",
+        orientation: "horizontal",
+        startCell: "",
+        endCell: ""
+    });
+    applyTableConfigurations();
+}
+
+function removeSubTableConfig(index) {
+    subTableConfigs.splice(index, 1);
+    applyTableConfigurations();
+}
+
+// --- FILE READING AND PARSING ---
 function handleFile() {
     const fileInput = document.getElementById('fileInput');
     const file = fileInput.files[0];
     if (!file) return;
 
-    // Regenerate Upload ID on file change
     currentUploadId = generateUploadId();
     updateUploadIdDisplay();
-
-    const userRowInput = parseInt(document.getElementById('headerOffset').value) || 1;
-    const sheetRangeOffset = Math.max(0, userRowInput - 1);
 
     const reader = new FileReader();
     reader.onload = function(evt) {
         const data = new Uint8Array(evt.target.result);
         const workbook = XLSX.read(data, { type: 'array', cellDates: true });
         
-        rawWorkbookData = {};
+        rawWorksheetObjects = {};
         const sheetSelect = document.getElementById('rawSheetSelect');
         const activeBeforeReload = currentSelectedSheet || sheetSelect.value;
 
         sheetSelect.innerHTML = '';
         workbook.SheetNames.forEach(sheetName => {
             sheetSelect.innerHTML += `<option value="${sheetName}">${sheetName}</option>`;
-            const worksheet = workbook.Sheets[sheetName];
-            
-            const json = XLSX.utils.sheet_to_json(worksheet, { range: sheetRangeOffset, defval: "" });
-            rawWorkbookData[sheetName] = json;
+            rawWorksheetObjects[sheetName] = workbook.Sheets[sheetName];
         });
 
         if (activeBeforeReload && workbook.SheetNames.includes(activeBeforeReload)) {
@@ -536,7 +625,8 @@ function handleFile() {
             currentSelectedSheet = sheetSelect.value;
         }
 
-        onSheetChange();
+        document.getElementById('tableConfigCard').style.display = 'block';
+        applyTableConfigurations();
 
         document.getElementById('rawPreviewCard').style.display = 'block';
         document.getElementById('mappingCard').style.display = 'block';
@@ -546,54 +636,184 @@ function handleFile() {
     reader.readAsArrayBuffer(file);
 }
 
-function onSheetChange() {
-    const selectedSheet = document.getElementById('rawSheetSelect').value;
-    currentSelectedSheet = selectedSheet;
-    const rows = rawWorkbookData[selectedSheet] || [];
+function parseCellRef(ref) {
+    if (!ref) return { col: 0, row: 0 };
+    const match = ref.match(/^([A-Z]+)(\d+)$/i);
+    if (!match) return { col: 0, row: 0 };
+    const colStr = match[1].toUpperCase();
+    let col = 0;
+    for (let i = 0; i < colStr.length; i++) {
+        col = col * 26 + (colStr.charCodeAt(i) - 64);
+    }
+    return { col: col - 1, row: parseInt(match[2], 10) - 1 };
+}
 
-    availableSourceColumns = [];
-    if (rows.length > 0) {
-        Object.keys(rows[0]).forEach(col => {
-            if (!availableSourceColumns.includes(col)) availableSourceColumns.push(col);
-        });
+function applyTableConfigurations() {
+    const sheetName = document.getElementById('rawSheetSelect') ? document.getElementById('rawSheetSelect').value : currentSelectedSheet;
+    currentSelectedSheet = sheetName;
+    const worksheet = rawWorksheetObjects[sheetName];
+
+    if (!worksheet) return;
+
+    // 1. Parse Main Table
+    const mainHeaderRow = (parseInt(document.getElementById('mainHeaderRow').value) || 1) - 1;
+    const mainDataStartRow = (parseInt(document.getElementById('mainDataStartRow').value) || 2) - 1;
+    const mainDataEndRowInput = document.getElementById('mainDataEndRow').value;
+    
+    let range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1:Z100');
+    if (mainDataEndRowInput) {
+        range.e.r = parseInt(mainDataEndRowInput) - 1;
     }
 
-    renderRawPreview();
+    const mainRows = [];
+    const mainHeaders = [];
+
+    for (let C = range.s.c; C <= range.e.c; ++C) {
+        const cell = worksheet[XLSX.utils.encode_cell({ r: mainHeaderRow, c: C })];
+        const val = cell ? cell.v : `Col_${C + 1}`;
+        mainHeaders.push(String(val).trim());
+    }
+
+    for (let R = mainDataStartRow; R <= range.e.r; ++R) {
+        const rowObj = {};
+        let hasValue = false;
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+            const cell = worksheet[XLSX.utils.encode_cell({ r: R, c: C })];
+            const header = mainHeaders[C - range.s.c];
+            let val = cell ? cell.v : "";
+            if (val instanceof Date) val = formatDateValue(val);
+            rowObj[header] = val;
+            if (val !== "") hasValue = true;
+        }
+        if (hasValue) mainRows.push(rowObj);
+    }
+
+    parsedMainTableData[sheetName] = mainRows;
+
+    // 2. Parse Sub-Tables
+    parsedSubTablesData[sheetName] = [];
+
+    subTableConfigs.forEach(cfg => {
+        if (!cfg.name || !cfg.startCell || !cfg.endCell) return;
+
+        const start = parseCellRef(cfg.startCell);
+        const end = parseCellRef(cfg.endCell);
+
+        if (cfg.orientation === 'horizontal') {
+            const subMap = {};
+            for (let R = start.row; R <= end.row; ++R) {
+                const keyCell = worksheet[XLSX.utils.encode_cell({ r: R, c: start.col })];
+                const valCell = worksheet[XLSX.utils.encode_cell({ r: R, c: start.col + 1 })];
+                if (keyCell && keyCell.v !== undefined && keyCell.v !== "") {
+                    let val = valCell ? valCell.v : "";
+                    if (val instanceof Date) val = formatDateValue(val);
+                    subMap[String(keyCell.v).trim()] = val;
+                }
+            }
+            parsedSubTablesData[sheetName].push({
+                name: cfg.name,
+                type: 'horizontal',
+                data: subMap
+            });
+        } else {
+            const subHeaders = [];
+            for (let C = start.col; C <= end.col; ++C) {
+                const cell = worksheet[XLSX.utils.encode_cell({ r: start.row, c: C })];
+                subHeaders.push(cell ? String(cell.v).trim() : `Col_${C}`);
+            }
+
+            const subRows = [];
+            for (let R = start.row + 1; R <= end.row; ++R) {
+                const rowObj = {};
+                for (let C = start.col; C <= end.col; ++C) {
+                    const cell = worksheet[XLSX.utils.encode_cell({ r: R, c: C })];
+                    const header = subHeaders[C - start.col];
+                    let val = cell ? cell.v : "";
+                    if (val instanceof Date) val = formatDateValue(val);
+                    rowObj[header] = val;
+                }
+                subRows.push(rowObj);
+            }
+
+            parsedSubTablesData[sheetName].push({
+                name: cfg.name,
+                type: 'vertical',
+                headers: subHeaders,
+                data: subRows
+            });
+        }
+    });
+
+    updateAvailableSourceColumns();
+    renderSubTableConfigs();
+    renderRawPreviews();
     renderMappingControls();
     autoDetectProfile();
 }
 
-function renderRawPreview() {
-    const container = document.getElementById('rawPreviewContainer');
-    const selectedSheet = document.getElementById('rawSheetSelect').value;
-    const rows = rawWorkbookData[selectedSheet] || [];
+function updateAvailableSourceColumns() {
+    const sheetName = document.getElementById('rawSheetSelect').value;
+    availableSourceColumns = [];
 
-    if (rows.length === 0) {
-        container.innerHTML = '<p style="color:#888;">No data found in this sheet.</p>';
-        return;
+    // Main table columns
+    const mainRows = parsedMainTableData[sheetName] || [];
+    if (mainRows.length > 0) {
+        Object.keys(mainRows[0]).forEach(c => {
+            if (c && !availableSourceColumns.includes(c)) availableSourceColumns.push(c);
+        });
     }
 
-    const headers = Object.keys(rows[0]);
-    let tableHtml = '<table><thead><tr>';
-    headers.forEach(h => tableHtml += `<th>${h}</th>`);
-    tableHtml += '</tr></thead><tbody>';
-
-    rows.slice(0, 5).forEach(row => {
-        tableHtml += '<tr>';
-        headers.forEach(h => {
-            let val = row[h] !== undefined ? row[h] : '';
-            if (val instanceof Date) val = formatDateValue(val);
-            tableHtml += `<td>${val}</td>`;
-        });
-        tableHtml += '</tr>';
+    // Sub-table keys/columns prefixed with Sub-Table Name
+    const subTables = parsedSubTablesData[sheetName] || [];
+    subTables.forEach(st => {
+        if (st.type === 'horizontal') {
+            Object.keys(st.data).forEach(k => {
+                const tag = `[${st.name}] ${k}`;
+                if (!availableSourceColumns.includes(tag)) availableSourceColumns.push(tag);
+            });
+        } else if (st.type === 'vertical') {
+            (st.headers || []).forEach(h => {
+                const tag = `[${st.name}] ${h}`;
+                if (!availableSourceColumns.includes(tag)) availableSourceColumns.push(tag);
+            });
+        }
     });
-    tableHtml += '</tbody></table>';
-    container.innerHTML = tableHtml;
 }
 
+function onSheetChange() {
+    applyTableConfigurations();
+}
+
+// --- RENDER RAW PREVIEWS ---
+function renderRawPreviews() {
+    const sheetName = document.getElementById('rawSheetSelect').value;
+    
+    // Main Table Preview
+    const mainContainer = document.getElementById('mainTablePreviewContainer');
+    const mainRows = parsedMainTableData[sheetName] || [];
+
+    if (mainRows.length === 0) {
+        mainContainer.innerHTML = '<p style="color:#888;">No main table data found.</p>';
+    } else {
+        const headers = Object.keys(mainRows[0]);
+        let tableHtml = '<table><thead><tr>';
+        headers.forEach(h => tableHtml += `<th>${h}</th>`);
+        tableHtml += '</tr></thead><tbody>';
+
+        mainRows.slice(0, 5).forEach(row => {
+            tableHtml += '<tr>';
+            headers.forEach(h => tableHtml += `<td>${row[h] !== undefined ? row[h] : ''}</td>`);
+            tableHtml += '</tr>';
+        });
+        tableHtml += '</tbody></table>';
+        mainContainer.innerHTML = tableHtml;
+    }
+}
+
+// --- MAPPING CONTROLS BUILDER ---
 function buildGridHtml(fields) {
-    const selectedSheet = document.getElementById('rawSheetSelect').value;
-    const sampleRow = (rawWorkbookData[selectedSheet] && rawWorkbookData[selectedSheet][0]) ? rawWorkbookData[selectedSheet][0] : {};
+    const sheetName = document.getElementById('rawSheetSelect').value;
+    const sampleMainRow = (parsedMainTableData[sheetName] && parsedMainTableData[sheetName][0]) ? parsedMainTableData[sheetName][0] : {};
     const warehouses = getUniqueWarehouses();
 
     let gridHtml = '';
@@ -605,11 +825,30 @@ function buildGridHtml(fields) {
             warehouses.forEach(wh => {
                 optionsHtml += `<option value="STATIC:${wh.code}">Static: ${wh.code} | ${wh.name}</option>`;
             });
-            optionsHtml += `</optgroup><optgroup label="Excel File Columns">`;
+            optionsHtml += `</optgroup><optgroup label="Extracted Table Columns">`;
         }
 
         availableSourceColumns.forEach(srcCol => {
-            let sampleValue = sampleRow[srcCol] !== undefined ? sampleRow[srcCol] : '';
+            let sampleValue = "";
+            if (srcCol.startsWith("[")) {
+                // Derived from sub-tables
+                const closingIdx = srcCol.indexOf("]");
+                const subName = srcCol.substring(1, closingIdx);
+                const keyName = srcCol.substring(closingIdx + 2);
+                
+                const subTables = parsedSubTablesData[sheetName] || [];
+                const matchedSub = subTables.find(s => s.name === subName);
+                if (matchedSub) {
+                    if (matchedSub.type === 'horizontal') {
+                        sampleValue = matchedSub.data[keyName] || "";
+                    } else if (matchedSub.data && matchedSub.data[0]) {
+                        sampleValue = matchedSub.data[0][keyName] || "";
+                    }
+                }
+            } else {
+                sampleValue = sampleMainRow[srcCol] !== undefined ? sampleMainRow[srcCol] : '';
+            }
+
             if (DATE_FIELDS.includes(targetField) || sampleValue instanceof Date) {
                 sampleValue = formatDateValue(sampleValue);
             } else {
@@ -618,7 +857,9 @@ function buildGridHtml(fields) {
 
             const previewText = sampleValue ? ` (e.g. "${String(sampleValue).substring(0, 18)}")` : ' (empty)';
             
-            const isMatch = srcCol.toLowerCase().replace(/[^a-z0-9]/g, '') === targetField.toLowerCase().replace(/[^a-z0-9]/g, '');
+            const rawColName = srcCol.includes("]") ? srcCol.substring(srcCol.indexOf("]") + 2) : srcCol;
+            const isMatch = rawColName.toLowerCase().replace(/[^a-z0-9]/g, '') === targetField.toLowerCase().replace(/[^a-z0-9]/g, '');
+            
             optionsHtml += `<option value="${srcCol}" ${isMatch ? 'selected' : ''}>${srcCol}${previewText}</option>`;
         });
 
@@ -632,6 +873,10 @@ function buildGridHtml(fields) {
             <div class="map-box">
                 <label>${displayLabel}</label>
                 <select id="map_${targetField}" onchange="applyMapping()" style="width:100%;">${optionsHtml}</select>
+                <div class="autofill-container">
+                    <input type="checkbox" id="autofill_${targetField}" onchange="applyMapping()">
+                    <label for="autofill_${targetField}" style="color:#333; margin:0; font-weight:normal;">Auto Fill As First Value</label>
+                </div>
             </div>
         `;
     });
@@ -736,35 +981,100 @@ async function saveVendorProfile() {
     applyMapping();
 }
 
+// --- TRANSFORM PAYLOAD & AUTO FILL FIRST VALUE ENGINE ---
 function applyMapping() {
     const currentMapping = {};
+    const autoFillFlags = {};
+
     ALL_TARGET_FIELDS.forEach(field => {
         const select = document.getElementById(`map_${field}`);
+        const chk = document.getElementById(`autofill_${field}`);
         if (select) currentMapping[field] = select.value;
+        if (chk) autoFillFlags[field] = chk.checked;
     });
 
-    const activeSheet = document.getElementById('rawSheetSelect').value;
-    const rawRows = rawWorkbookData[activeSheet] || [];
+    const sheetName = document.getElementById('rawSheetSelect').value;
+    const mainRows = parsedMainTableData[sheetName] || [];
+    const subTables = parsedSubTablesData[sheetName] || [];
 
-    transformedPayloadData = rawRows.map(row => {
+    // First Value Map across dataset for AutoFill fields
+    const firstValueMap = {};
+
+    ALL_TARGET_FIELDS.forEach(target => {
+        if (!autoFillFlags[target]) return;
+
+        const src = currentMapping[target];
+        if (!src || src === "[ Ignore Field ]") return;
+
+        if (src.startsWith("STATIC:")) {
+            firstValueMap[target] = src.replace("STATIC:", "");
+            return;
+        }
+
+        if (src.startsWith("[")) {
+            // Source is Sub-table
+            const closingIdx = src.indexOf("]");
+            const subName = src.substring(1, closingIdx);
+            const keyName = src.substring(closingIdx + 2);
+            const matchedSub = subTables.find(s => s.name === subName);
+
+            if (matchedSub) {
+                if (matchedSub.type === 'horizontal') {
+                    firstValueMap[target] = matchedSub.data[keyName] || "";
+                } else if (matchedSub.data && matchedSub.data[0]) {
+                    firstValueMap[target] = matchedSub.data[0][keyName] || "";
+                }
+            }
+        } else {
+            // Source is Main table
+            for (let r of mainRows) {
+                if (r[src] !== undefined && r[src] !== null && r[src] !== "") {
+                    firstValueMap[target] = r[src];
+                    break;
+                }
+            }
+        }
+    });
+
+    transformedPayloadData = mainRows.map((row, rowIndex) => {
         const transformedRow = {};
+
         ALL_TARGET_FIELDS.forEach(target => {
+            if (autoFillFlags[target] && firstValueMap[target] !== undefined) {
+                let val = firstValueMap[target];
+                transformedRow[target] = DATE_FIELDS.includes(target) ? formatDateValue(val) : String(val).trim();
+                return;
+            }
+
             const src = currentMapping[target];
             if (src && src !== "[ Ignore Field ]") {
                 if (src.startsWith("STATIC:")) {
                     transformedRow[target] = src.replace("STATIC:", "");
+                } else if (src.startsWith("[")) {
+                    // Sub-table extraction per row or scalar
+                    const closingIdx = src.indexOf("]");
+                    const subName = src.substring(1, closingIdx);
+                    const keyName = src.substring(closingIdx + 2);
+                    const matchedSub = subTables.find(s => s.name === subName);
+
+                    let val = "";
+                    if (matchedSub) {
+                        if (matchedSub.type === 'horizontal') {
+                            val = matchedSub.data[keyName] || "";
+                        } else if (matchedSub.data && matchedSub.data[rowIndex]) {
+                            val = matchedSub.data[rowIndex][keyName] || "";
+                        }
+                    }
+                    transformedRow[target] = DATE_FIELDS.includes(target) ? formatDateValue(val) : String(val).trim();
                 } else {
                     let val = row[src] !== undefined && row[src] !== null ? row[src] : "";
-                    if (DATE_FIELDS.includes(target) || val instanceof Date) {
-                        transformedRow[target] = formatDateValue(val);
-                    } else {
-                        transformedRow[target] = String(val).trim();
-                    }
+                    transformedRow[target] = DATE_FIELDS.includes(target) || val instanceof Date ? formatDateValue(val) : String(val).trim();
                 }
             } else {
                 transformedRow[target] = "";
             }
         });
+
         return transformedRow;
     }).filter(row => Object.values(row).some(val => val !== "" && val !== null && val !== undefined));
 
