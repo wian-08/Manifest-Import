@@ -104,7 +104,6 @@
 <div class="card" id="tableConfigCard" style="display:none;">
     <div class="between">
         <h3>📐 Table Boundaries & Sub-Table Configuration</h3>
-        <button class="btn-secondary btn-sm" onclick="applyTableConfigurations()">🔄 Re-parse Tables</button>
     </div>
 
     <!-- Main Table Spec -->
@@ -112,13 +111,13 @@
         <h4 style="margin: 0 0 8px 0; color: #107c41;">Main Data Table Bounds</h4>
         <div class="flex">
             <label>Header Row: 
-                <input type="number" id="mainHeaderRow" value="14" min="1" style="width:65px;">
+                <input type="number" id="mainHeaderRow" value="14" min="1" oninput="applyTableConfigurations()" style="width:65px;">
             </label>
             <label>Data Start Row: 
-                <input type="number" id="mainDataStartRow" value="15" min="1" style="width:65px;">
+                <input type="number" id="mainDataStartRow" value="15" min="1" oninput="applyTableConfigurations()" style="width:65px;">
             </label>
             <label>Data End Row (Optional): 
-                <input type="number" id="mainDataEndRow" placeholder="Auto" style="width:75px;">
+                <input type="number" id="mainDataEndRow" placeholder="Auto" oninput="applyTableConfigurations()" style="width:75px;">
             </label>
         </div>
     </div>
@@ -291,11 +290,7 @@ const FIELD_LABELS = {
 let rawWorksheetObjects = {};
 let parsedMainTableData = {};
 let parsedSubTablesData = {};
-let subTableConfigs = [
-    { name: "", orientation: "horizontal", startCell: "", endCell: "" },
-    { name: "", orientation: "horizontal", startCell: "", endCell: "" },
-    { name: "", orientation: "horizontal", startCell: "", endCell: "" }
-];
+let subTableConfigs = [];
 
 let autoFillConfig = {};
 let transformedPayloadData = [];
@@ -402,6 +397,7 @@ async function loadSuppliers() {
             const data = await res.json();
             supplierList = Array.isArray(data) ? data : (data.value || data.body || []);
             renderSupplierDropdown();
+            renderProfileDropdown();
         }
     } catch (err) {
         console.warn("Error fetching suppliers:", err);
@@ -437,7 +433,7 @@ async function loadDataverseVendorProfiles(isManual = false) {
     }
 
     if (!rawData) {
-        renderVendorDropdown();
+        renderProfileDropdown();
         return;
     }
 
@@ -459,7 +455,7 @@ async function loadDataverseVendorProfiles(isManual = false) {
         vendorProfiles[vendorAccount] = mapping;
     });
 
-    renderVendorDropdown();
+    renderProfileDropdown();
     if (availableSourceColumns.length > 0) autoDetectProfile();
 }
 
@@ -474,11 +470,17 @@ async function loadStorageLocations() {
     if (availableSourceColumns.length > 0) renderMappingControls();
 }
 
-function renderVendorDropdown() {
+function renderProfileDropdown() {
     const select = document.getElementById('profileSelect');
     select.innerHTML = '<option value="">Custom Mapping</option>';
+    
     Object.keys(vendorProfiles).forEach(vendor => {
-        select.innerHTML += `<option value="${vendor}">${vendor}</option>`;
+        // Find matching vendor name from loaded supplierList or fallback to account
+        const matchedSup = supplierList.find(s => (s.VendorAccount || "").toLowerCase() === vendor.toLowerCase());
+        const vendorName = matchedSup ? (matchedSup.VendorName || "") : "";
+        const displayName = vendorName ? `${vendor} | ${vendorName}` : vendor;
+
+        select.innerHTML += `<option value="${vendor}">${displayName}</option>`;
     });
 }
 
@@ -508,6 +510,11 @@ function renderSubTableConfigs() {
 
     const sheetName = document.getElementById('rawSheetSelect') ? document.getElementById('rawSheetSelect').value : currentSelectedSheet;
     const currentSheetSubTables = parsedSubTablesData[sheetName] || [];
+
+    if (subTableConfigs.length === 0) {
+        container.innerHTML = '<p style="color:#888; font-size:13px; margin: 5px 0;">No sub-tables configured yet. Click "+ Add Sub-Table" to add one.</p>';
+        return;
+    }
 
     subTableConfigs.forEach((cfg, index) => {
         const matchedParsedSub = currentSheetSubTables.find(st => st.name === cfg.name);
@@ -943,7 +950,14 @@ async function saveVendorProfile() {
     if (!vendorAccount) vendorAccount = document.getElementById('profileSelect').value;
     if (!vendorAccount) return alert('Please select a Supplier Account from the dropdown.');
 
-    const payload = { "manimp_vendoraccount": vendorAccount };
+    // Look up supplier name from supplierList
+    const matchedSup = supplierList.find(s => (s.VendorAccount || "").toLowerCase() === vendorAccount.toLowerCase());
+    const supplierName = matchedSup ? (matchedSup.VendorName || "") : "";
+
+    const payload = { 
+        "manimp_vendoraccount": vendorAccount,
+        "SupplierName": supplierName 
+    };
     const localMapping = {};
 
     ALL_TARGET_FIELDS.forEach(field => {
@@ -954,6 +968,8 @@ async function saveVendorProfile() {
         if (val !== "[ Ignore Field ]") {
             payload[dvKey] = val;
             localMapping[field] = val;
+        } else {
+            payload[dvKey] = null;
         }
     });
 
@@ -966,7 +982,7 @@ async function saveVendorProfile() {
 
         if (res.ok) {
             vendorProfiles[vendorAccount] = localMapping;
-            renderVendorDropdown();
+            renderProfileDropdown();
             document.getElementById('profileSelect').value = vendorAccount;
             alert(`Profile for '${vendorAccount}' successfully saved to Dataverse!`);
         } else {
