@@ -160,7 +160,7 @@
                 <select id="profileSelect" onchange="onProfileChange()"><option value="">Custom Mapping</option></select>
             </label>
             <label>Supplier: 
-                <select id="supplierSelect" style="max-width: 320px;">
+                <select id="supplierSelect" style="max-width: 320px;" onchange="applyMapping()">
                     <option value="">-- Select Supplier --</option>
                 </select>
             </label>
@@ -218,7 +218,7 @@ function toggleSection(contentId, iconId) {
 // Power Automate Endpoints
 const FLOW_URL = "https://85500d109789e5f2ace8d185982bcb.4a.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/13/workflows/aa1d80f9d0f74ad787ae43bbb65fccc0/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=I6IB9KIuM9oGOoO8Ax--WshqBgo9JXdT_Vr5b7ULlng";
 const FETCH_PROFILES_URL = "https://85500d109789e5f2ace8d185982bcb.4a.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/06/workflows/56d246b0844840989b72cba1cbc1574d/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=1N9qZxYEaXDyRBGcuMzsl1H2hVad94GYjo4eYj7YtXc";
-const SAVE_PROFILE_URL = "https://85500d109789e5f2ace8d185982bcb.4a.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/22/workflows/406e231a4cde46f0bbf763cc31c91ebb/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=WwE3tGUb-OF5c8C90fu_EYwzs2M5dJgpXaq8-kgNlRE";
+const SAVE_PROFILE_URL = "https://85500d109789e5f2ace8d185982bcb.4a.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/05/workflows/d81434eea65548e295aa20007f3f953c/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=MBxTE_4kEB338yJ4GpiDBSXnbpjak3W9xzA_Qop6c9U";
 const FETCH_LOCATIONS_URL = "https://b1a78497e32be5af85a1519f752e3d.4b.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/01/workflows/d89a531daacd4aed9de7653612a5204b/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=BFt4PpB7g8qe_zhKs2srjDdgqjtf9amNmzYs0Lv0E5o";
 const FETCH_SUPPLIERS_URL = "https://85500d109789e5f2ace8d185982bcb.4a.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/02/workflows/43f58a3976934b78ad5734ef63b99a5e/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=4x8cgRF1Ywi5KlVcvQyJ8kuR3bhp0q9vH3flMjQchuU";
 
@@ -328,40 +328,85 @@ function updateUploadIdDisplay() {
 }
 
 function formatDateValue(val) {
-    if (!val && val !== 0) return "";
-    let dateObj = null;
+    if (val === null || val === undefined || val === "") return "";
 
-    if (typeof val === 'number' || (!isNaN(val) && !String(val).includes('-') && !String(val).includes('/'))) {
-        const num = parseFloat(val);
+    // Handle JS Date objects directly without timezone conversions
+    if (val instanceof Date) {
+        if (isNaN(val.getTime())) return "";
+        const mm = String(val.getMonth() + 1).padStart(2, '0');
+        const dd = String(val.getDate()).padStart(2, '0');
+        const yyyy = val.getFullYear();
+        return `${mm}/${dd}/${yyyy}`;
+    }
+
+    let strVal = String(val).trim();
+
+    // Handle Excel numeric serial dates (e.g. 46098.0)
+    if (typeof val === 'number' || (!isNaN(strVal) && !strVal.includes('/') && !strVal.includes('-'))) {
+        const num = parseFloat(strVal);
         if (num > 25569) {
-            dateObj = new Date((num - (25567 + 2)) * 86400 * 1000);
+            // Standard Excel Epoch: Dec 30, 1899
+            const dateObj = new Date(Math.round((num - 25569) * 86400 * 1000));
+            const mm = String(dateObj.getUTCMonth() + 1).padStart(2, '0');
+            const dd = String(dateObj.getUTCDate()).padStart(2, '0');
+            const yyyy = dateObj.getUTCFullYear();
+            return `${mm}/${dd}/${yyyy}`;
         }
     }
 
-    if (!dateObj && typeof val === 'string' && val.includes('/')) {
-        const parts = val.split('/');
+    // Handle standard date strings with slashes (MM/DD/YYYY or DD/MM/YYYY)
+    if (strVal.includes('/')) {
+        const parts = strVal.split('/');
         if (parts.length === 3) {
-            const day = parseInt(parts[0], 10);
-            const month = parseInt(parts[1], 10) - 1;
-            const year = parseInt(parts[2], 10);
-            if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
-                dateObj = new Date(year, month, day);
+            let p1 = parseInt(parts[0], 10);
+            let p2 = parseInt(parts[1], 10);
+            let year = parseInt(parts[2], 10);
+            if (year < 100) year += 2000;
+
+            let month, day;
+            if (p1 > 12) {
+                // First part is Day (DD/MM/YYYY)
+                day = p1;
+                month = p2;
+            } else if (p2 > 12) {
+                // Second part is Day (MM/DD/YYYY)
+                month = p1;
+                day = p2;
+            } else {
+                // Default to MM/DD/YYYY
+                month = p1;
+                day = p2;
+            }
+
+            if (!isNaN(month) && !isNaN(day) && !isNaN(year)) {
+                const mm = String(month).padStart(2, '0');
+                const dd = String(day).padStart(2, '0');
+                return `${mm}/${dd}/${year}`;
             }
         }
     }
 
-    if (!dateObj) {
-        dateObj = new Date(val);
+    // Handle ISO or dashed strings (YYYY-MM-DD or DD-MM-YYYY)
+    if (strVal.includes('-')) {
+        const parts = strVal.split('-');
+        if (parts.length === 3) {
+            if (parts[0].length === 4) {
+                // YYYY-MM-DD
+                const yyyy = parts[0];
+                const mm = String(parseInt(parts[1], 10)).padStart(2, '0');
+                const dd = String(parseInt(parts[2], 10)).padStart(2, '0');
+                return `${mm}/${dd}/${yyyy}`;
+            } else {
+                // DD-MM-YYYY
+                const dd = String(parseInt(parts[0], 10)).padStart(2, '0');
+                const mm = String(parseInt(parts[1], 10)).padStart(2, '0');
+                const yyyy = parts[2];
+                return `${mm}/${dd}/${yyyy}`;
+            }
+        }
     }
 
-    if (dateObj && !isNaN(dateObj.getTime())) {
-        const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
-        const dd = String(dateObj.getDate()).padStart(2, '0');
-        const yyyy = dateObj.getFullYear();
-        return `${mm}/${dd}/${yyyy}`;
-    }
-
-    return String(val).trim();
+    return strVal;
 }
 
 function getProp(obj, possibleKeys) {
@@ -475,7 +520,6 @@ function renderProfileDropdown() {
     select.innerHTML = '<option value="">Custom Mapping</option>';
     
     Object.keys(vendorProfiles).forEach(vendor => {
-        // Find matching vendor name from loaded supplierList or fallback to account
         const matchedSup = supplierList.find(s => (s.VendorAccount || "").toLowerCase() === vendor.toLowerCase());
         const vendorName = matchedSup ? (matchedSup.VendorName || "") : "";
         const displayName = vendorName ? `${vendor} | ${vendorName}` : vendor;
@@ -613,7 +657,8 @@ function handleFile() {
     const reader = new FileReader();
     reader.onload = function(evt) {
         const data = new Uint8Array(evt.target.result);
-        const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+        // Use rawNF: true to prioritize formatted text over JS Date object conversion
+        const workbook = XLSX.read(data, { type: 'array', cellDates: false, rawNF: true });
         
         rawWorksheetObjects = {};
         const sheetSelect = document.getElementById('rawSheetSelect');
@@ -655,6 +700,13 @@ function parseCellRef(ref) {
     return { col: col - 1, row: parseInt(match[2], 10) - 1 };
 }
 
+function getCellValue(cell) {
+    if (!cell) return "";
+    if (cell.w !== undefined) return cell.w; // Formatted text
+    if (cell.v !== undefined) return cell.v;
+    return "";
+}
+
 function applyTableConfigurations() {
     const sheetName = document.getElementById('rawSheetSelect') ? document.getElementById('rawSheetSelect').value : currentSelectedSheet;
     currentSelectedSheet = sheetName;
@@ -677,7 +729,7 @@ function applyTableConfigurations() {
 
     for (let C = range.s.c; C <= range.e.c; ++C) {
         const cell = worksheet[XLSX.utils.encode_cell({ r: mainHeaderRow, c: C })];
-        const val = cell ? cell.v : `Col_${C + 1}`;
+        const val = getCellValue(cell) || `Col_${C + 1}`;
         mainHeaders.push(String(val).trim());
     }
 
@@ -687,8 +739,10 @@ function applyTableConfigurations() {
         for (let C = range.s.c; C <= range.e.c; ++C) {
             const cell = worksheet[XLSX.utils.encode_cell({ r: R, c: C })];
             const header = mainHeaders[C - range.s.c];
-            let val = cell ? cell.v : "";
-            if (val instanceof Date) val = formatDateValue(val);
+            let val = getCellValue(cell);
+            if (DATE_FIELDS.includes(header.toUpperCase())) {
+                val = formatDateValue(val);
+            }
             rowObj[header] = val;
             if (val !== "") hasValue = true;
         }
@@ -711,10 +765,11 @@ function applyTableConfigurations() {
             for (let R = start.row; R <= end.row; ++R) {
                 const keyCell = worksheet[XLSX.utils.encode_cell({ r: R, c: start.col })];
                 const valCell = worksheet[XLSX.utils.encode_cell({ r: R, c: start.col + 1 })];
-                if (keyCell && keyCell.v !== undefined && keyCell.v !== "") {
-                    let val = valCell ? valCell.v : "";
-                    if (val instanceof Date) val = formatDateValue(val);
-                    subMap[String(keyCell.v).trim()] = val;
+                const keyVal = getCellValue(keyCell);
+                if (keyVal !== undefined && keyVal !== "") {
+                    let val = getCellValue(valCell);
+                    val = formatDateValue(val);
+                    subMap[String(keyVal).trim()] = val;
                 }
             }
             parsedSubTablesData[sheetName].push({
@@ -726,7 +781,8 @@ function applyTableConfigurations() {
             const subHeaders = [];
             for (let C = start.col; C <= end.col; ++C) {
                 const cell = worksheet[XLSX.utils.encode_cell({ r: start.row, c: C })];
-                subHeaders.push(cell ? String(cell.v).trim() : `Col_${C}`);
+                const val = getCellValue(cell);
+                subHeaders.push(val ? String(val).trim() : `Col_${C}`);
             }
 
             const subRows = [];
@@ -735,8 +791,8 @@ function applyTableConfigurations() {
                 for (let C = start.col; C <= end.col; ++C) {
                     const cell = worksheet[XLSX.utils.encode_cell({ r: R, c: C })];
                     const header = subHeaders[C - start.col];
-                    let val = cell ? cell.v : "";
-                    if (val instanceof Date) val = formatDateValue(val);
+                    let val = getCellValue(cell);
+                    val = formatDateValue(val);
                     rowObj[header] = val;
                 }
                 subRows.push(rowObj);
@@ -918,7 +974,10 @@ function autoDetectProfile() {
 
 function onProfileChange() {
     const vendorAccount = document.getElementById('profileSelect').value;
-    document.getElementById('supplierSelect').value = vendorAccount;
+    const supplierSelect = document.getElementById('supplierSelect');
+    
+    const matchedOpt = Array.from(supplierSelect.options).find(opt => opt.value.toLowerCase().trim() === vendorAccount.toLowerCase().trim());
+    supplierSelect.value = matchedOpt ? matchedOpt.value : vendorAccount;
 
     if (!vendorAccount || !vendorProfiles[vendorAccount]) {
         applyMapping();
@@ -950,12 +1009,12 @@ async function saveVendorProfile() {
     if (!vendorAccount) vendorAccount = document.getElementById('profileSelect').value;
     if (!vendorAccount) return alert('Please select a Supplier Account from the dropdown.');
 
-    // Look up supplier name from supplierList
     const matchedSup = supplierList.find(s => (s.VendorAccount || "").toLowerCase() === vendorAccount.toLowerCase());
     const supplierName = matchedSup ? (matchedSup.VendorName || "") : "";
 
     const payload = { 
         "manimp_vendoraccount": vendorAccount,
+        "VendorAccount": vendorAccount,
         "SupplierName": supplierName 
     };
     const localMapping = {};
@@ -1028,7 +1087,6 @@ function applyMapping() {
         }
 
         if (src.startsWith("[")) {
-            // Source is Sub-table
             const closingIdx = src.indexOf("]");
             const subName = src.substring(1, closingIdx);
             const keyName = src.substring(closingIdx + 2);
@@ -1036,16 +1094,15 @@ function applyMapping() {
 
             if (matchedSub) {
                 if (matchedSub.type === 'horizontal') {
-                    firstValueMap[target] = matchedSub.data[keyName] || "";
+                    firstValueMap[target] = formatDateValue(matchedSub.data[keyName] || "");
                 } else if (matchedSub.data && matchedSub.data[0]) {
-                    firstValueMap[target] = matchedSub.data[0][keyName] || "";
+                    firstValueMap[target] = formatDateValue(matchedSub.data[0][keyName] || "");
                 }
             }
         } else {
-            // Source is Main table
             for (let r of mainRows) {
                 if (r[src] !== undefined && r[src] !== null && r[src] !== "") {
-                    firstValueMap[target] = r[src];
+                    firstValueMap[target] = formatDateValue(r[src]);
                     break;
                 }
             }
@@ -1054,8 +1111,18 @@ function applyMapping() {
 
     transformedPayloadData = mainRows.map((row, rowIndex) => {
         const transformedRow = {};
+        const selectedSupplierAcc = document.getElementById('supplierSelect')?.value || "";
 
         ALL_TARGET_FIELDS.forEach(target => {
+            // Forcefully inject selected supplier dropdown value into VENDORACCOUNT if unmapped
+            if (target === "VENDORACCOUNT") {
+                const src = currentMapping[target];
+                if (!src || src === "[ Ignore Field ]") {
+                    transformedRow[target] = selectedSupplierAcc;
+                    return;
+                }
+            }
+
             if (autoFillFlags[target] && firstValueMap[target] !== undefined) {
                 let val = firstValueMap[target];
                 transformedRow[target] = DATE_FIELDS.includes(target) ? formatDateValue(val) : String(val).trim();
@@ -1067,7 +1134,6 @@ function applyMapping() {
                 if (src.startsWith("STATIC:")) {
                     transformedRow[target] = src.replace("STATIC:", "");
                 } else if (src.startsWith("[")) {
-                    // Sub-table extraction per row or scalar
                     const closingIdx = src.indexOf("]");
                     const subName = src.substring(1, closingIdx);
                     const keyName = src.substring(closingIdx + 2);
@@ -1137,11 +1203,14 @@ async function uploadPayload() {
     const file = document.getElementById('fileInput').files[0];
     if (!currentUploadId) currentUploadId = generateUploadId();
 
+    const selectedVendorAcc = document.getElementById('supplierSelect')?.value || "";
+
     const payload = {
         uploadId: currentUploadId,
         fileName: file ? file.name : "",
         templateType: "TD_IntakeArrivalLineStaging",
-        vendorProfile: document.getElementById('supplierSelect').value || document.getElementById('profileSelect').value || "Custom",
+        vendorProfile: selectedVendorAcc || document.getElementById('profileSelect').value || "Custom",
+        vendorAccount: selectedVendorAcc,
         data: transformedPayloadData
     };
 
